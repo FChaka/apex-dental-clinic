@@ -21,14 +21,16 @@ return [
     'domain_model' => Domain::class,
 
     /**
-     * The list of domains hosting your central app.
+     * The list of domains hosting your central app (apex parent only, e.g. apex.com — not each tenant subdomain).
      *
      * Only relevant if you're using the domain or subdomain identification middleware.
+     *
+     * @see env('TENANCY_CENTRAL_DOMAINS')
      */
-    'central_domains' => [
-        '127.0.0.1',
-        'localhost',
-    ],
+    'central_domains' => array_values(array_filter(array_map(
+        trim(...),
+        explode(',', (string) env('TENANCY_CENTRAL_DOMAINS', 'localhost,127.0.0.1'))
+    ))),
 
     /**
      * Tenancy bootstrappers are executed when tenancy is initialized.
