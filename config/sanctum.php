@@ -38,10 +38,10 @@ return [
     */
 
     /*
-     * Session guards checked for first-party SPA requests (HttpOnly session cookie + CSRF).
-     * Use platform_session / clinic_session after login on the corresponding flow (Step 5).
+     * Session guards checked before bearer tokens for first-party SPA cookie auth.
+     * Clinic/platform JSON APIs use PAT only; dedicated session guards are omitted so Bearer is not shadowed.
      */
-    'guard' => ['web', 'platform_session', 'clinic_session'],
+    'guard' => ['web'],
 
     /*
     |--------------------------------------------------------------------------
