@@ -17,7 +17,10 @@ return new class extends Migration
             $table->boolean('is_initial_exam')->default(false);
             $table->timestamps();
 
-            $table->unique(['patient_id', 'tooth_number', 'surface_key', 'is_initial_exam']);
+            $table->unique(
+                ['patient_id', 'tooth_number', 'surface_key', 'is_initial_exam'],
+                'tcs_patient_tooth_surface_initial_unq'
+            );
         });
     }
 
