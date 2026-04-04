@@ -6,10 +6,15 @@ namespace App\Models\Central;
 
 use Stancl\Tenancy\Contracts\TenantWithDatabase;
 use Stancl\Tenancy\Database\Concerns\HasDatabase;
+use Stancl\Tenancy\Database\Concerns\HasDomains;
 use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
+use Stancl\Tenancy\Middleware\InitializeTenancyBySubdomain;
 
 /**
  * Central registry row for a clinic; also the stancl tenant record.
+ *
+ * Tenant identification on the web uses {@see InitializeTenancyBySubdomain}:
+ * each row in `domains` should use the same string as `slug` (e.g. domain `smile` for `smile.apex.com`).
  *
  * @property int $id
  * @property string $slug
@@ -17,12 +22,12 @@ use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
  */
 class Clinic extends BaseTenant implements TenantWithDatabase
 {
-    use HasDatabase;
+    use HasDatabase, HasDomains;
 
     protected $table = 'clinics';
 
     /**
-     * Tenant resolution uses the public clinic slug (e.g. login payload `clinic_slug`).
+     * Stancl tenant key column on `clinics` (subdomain label is stored in `domains.domain`, usually equal to this slug).
      */
     public function getTenantKeyName(): string
     {

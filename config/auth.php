@@ -1,5 +1,9 @@
 <?php
 
+use App\Models\Central\PlatformAdmin;
+use App\Models\Tenant\StaffMember;
+use App\Models\User;
+
 return [
 
     /*
@@ -9,7 +13,7 @@ return [
     |
     | This option defines the default authentication "guard" and password
     | reset "broker" for your application. You may change these values
-    | as required, but they're a perfect start for most applications.
+    | as required, but they are a perfect start for most applications.
     |
     */
 
@@ -25,11 +29,11 @@ return [
     |
     | Next, you may define every authentication guard for your application.
     | Of course, a great default configuration has been defined for you
-    | which utilizes session storage plus the Eloquent user provider.
+    | here which uses session storage and the Eloquent user provider.
     |
     | All authentication guards have a user provider, which defines how the
     | users are actually retrieved out of your database or other storage
-    | system used by the application. Typically, Eloquent is utilized.
+    | system used by your application. Typically, Eloquent is utilized.
     |
     | Supported: "session"
     |
@@ -40,6 +44,34 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+
+        /*
+         * Stateful SPA session guards (HttpOnly session cookie) checked by Sanctum before bearer tokens.
+         */
+        'platform_session' => [
+            'driver' => 'session',
+            'provider' => 'platform_admins',
+        ],
+        'clinic_session' => [
+            'driver' => 'session',
+            'provider' => 'staff_members',
+        ],
+
+        /*
+         * API guards: Sanctum (session from guards above, then personal access tokens on the right connection).
+         */
+        'sanctum' => [
+            'driver' => 'sanctum',
+            'provider' => 'users',
+        ],
+        'platform' => [
+            'driver' => 'sanctum',
+            'provider' => 'platform_admins',
+        ],
+        'clinic' => [
+            'driver' => 'sanctum',
+            'provider' => 'staff_members',
+        ],
     ],
 
     /*
@@ -49,11 +81,7 @@ return [
     |
     | All authentication guards have a user provider, which defines how the
     | users are actually retrieved out of your database or other storage
-    | system used by the application. Typically, Eloquent is utilized.
-    |
-    | If you have multiple user tables or models you may configure multiple
-    | providers to represent the model / table. These providers may then
-    | be assigned to any extra authentication guards you have defined.
+    | system used by your application. Typically, Eloquent is utilized.
     |
     | Supported: "database", "eloquent"
     |
@@ -62,7 +90,17 @@ return [
     'providers' => [
         'users' => [
             'driver' => 'eloquent',
-            'model' => env('AUTH_MODEL', App\Models\User::class),
+            'model' => env('AUTH_MODEL', User::class),
+        ],
+
+        'platform_admins' => [
+            'driver' => 'eloquent',
+            'model' => PlatformAdmin::class,
+        ],
+
+        'staff_members' => [
+            'driver' => 'eloquent',
+            'model' => StaffMember::class,
         ],
 
         // 'users' => [
@@ -78,11 +116,10 @@ return [
     |
     | These configuration options specify the behavior of Laravel's password
     | reset functionality, including the table utilized for token storage
-    | and the user provider that is invoked to actually retrieve users.
-    |
+    | and the user provider that is invoked to actually retrieve the users.
     | The expiry time is the number of minutes that each reset token will be
     | considered valid. This security feature keeps tokens short-lived so
-    | they have less time to be guessed. You may change this as needed.
+    | they have less time to be guessed.
     |
     | The throttle setting is the number of seconds a user must wait before
     | generating more password reset tokens. This prevents the user from
