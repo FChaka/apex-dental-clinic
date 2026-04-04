@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models\Tenant;
 
+use Database\Factories\Tenant\StaffMemberFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -12,7 +14,8 @@ use Laravel\Sanctum\HasApiTokens;
 
 class StaffMember extends Authenticatable
 {
-    use HasApiTokens, Notifiable, SoftDeletes;
+    /** @use HasFactory<StaffMemberFactory> */
+    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
     protected $table = 'staff_members';
 
@@ -70,5 +73,10 @@ class StaffMember extends Authenticatable
     public function tokens(): MorphMany
     {
         return $this->morphMany(PersonalAccessToken::class, 'tokenable');
+    }
+
+    protected static function newFactory(): StaffMemberFactory
+    {
+        return StaffMemberFactory::new();
     }
 }
