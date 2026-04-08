@@ -73,7 +73,17 @@ function tenantHttpHost(Clinic $clinic): string
 }
 
 /**
- * Absolute URL so {@see Request::getHost()} matches subdomain tenancy (HTTP_HOST alone is not always applied by the test client).
+ * Host for the API (single domain for all tenants), e.g. api.apex.test when APP_URL is http://apex.test.
+ */
+function apiHttpHost(): string
+{
+    $host = parse_url((string) config('app.url'), PHP_URL_HOST);
+
+    return is_string($host) && $host !== '' ? 'api.'.$host : 'api.apex.test';
+}
+
+/**
+ * Clinic SPA origin URL (Referer) — {slug}.apex.test.
  */
 function tenantUrl(Clinic $clinic, string $path): string
 {
@@ -81,13 +91,24 @@ function tenantUrl(Clinic $clinic, string $path): string
 }
 
 /**
- * Referer header so Sanctum's EnsureFrontendRequestsAreStateful applies the session stack.
+ * Absolute URL to the API for clinic routes (requires X-Tenant-Slug).
+ */
+function clinicApiUrl(Clinic $clinic, string $path): string
+{
+    return 'http://'.apiHttpHost().'/'.ltrim($path, '/');
+}
+
+/**
+ * Referer + tenant slug so Sanctum stateful middleware applies and ResolveTenantFromHeader can initialize tenancy.
  *
  * @return array<string, string>
  */
 function clinicStatefulHeaders(Clinic $clinic): array
 {
-    return ['Referer' => tenantUrl($clinic, '/')];
+    return [
+        'Referer' => tenantUrl($clinic, '/'),
+        'X-Tenant-Slug' => $clinic->slug,
+    ];
 }
 
 /**
@@ -138,7 +159,7 @@ afterEach(function () {
     foreach (array_reverse($__tenantsToDrop) as $clinic) {
         try {
             dropTenantDatabaseIfExists($clinic);
-        } catch (\Throwable) {
+        } catch (Throwable) {
             // Best-effort cleanup; tests should still fail on assertions, not cleanup.
         }
     }

@@ -12,19 +12,18 @@ Route::get('/health', function () {
 
 Route::prefix('auth')->name('api.auth.')->group(function () {
     Route::post('login', [ClinicAuthController::class, 'login'])
-        ->middleware('clinic.tenancy')
         ->name('login');
 
     Route::post('logout', [ClinicAuthController::class, 'logout'])
-        ->middleware(['clinic.tenancy', 'auth:clinic_session'])
+        ->middleware('auth:clinic_session')
         ->name('logout');
 
     Route::get('me', [ClinicAuthController::class, 'me'])
-        ->middleware(['clinic.tenancy', 'auth:clinic_session'])
+        ->middleware('auth:clinic_session')
         ->name('me');
 
     Route::post('switch-staff', [ClinicAuthController::class, 'switchStaff'])
-        ->middleware(['clinic.tenancy', 'auth:clinic_session'])
+        ->middleware('auth:clinic_session')
         ->name('switch-staff');
 });
 

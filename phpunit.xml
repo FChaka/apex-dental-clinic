@@ -29,7 +29,7 @@
         <env name="APP_URL" value="http://apex.test" force="true"/>
         <env name="TENANCY_CENTRAL_DOMAINS" value="apex.test" force="true"/>
         <env name="TENANCY_ROUTES" value="true" force="true"/>
-        <env name="SANCTUM_STATEFUL_DOMAINS" value="apex.test,.apex.test,*.apex.test" force="true"/>
+        <env name="SANCTUM_STATEFUL_DOMAINS" value="apex.test,.apex.test,api.apex.test,*.apex.test" force="true"/>
         <env name="SESSION_DOMAIN" value=".apex.test" force="true"/>
         <env name="MAIL_MAILER" value="array" force="true"/>
         <env name="PULSE_ENABLED" value="false" force="true"/>

@@ -27,7 +27,7 @@ it('returns staff and permissions on valid clinic PIN login without token', func
     ]);
 
     $response = $this->withHeaders(clinicStatefulHeaders($this->clinic))
-        ->postJson(tenantUrl($this->clinic, 'api/auth/login'), [
+        ->postJson(clinicApiUrl($this->clinic, 'api/auth/login'), [
             'username' => 'alice',
             'pin' => '4242',
         ]);
@@ -51,7 +51,7 @@ it('returns 401 on invalid clinic PIN', function () {
     ]);
 
     $this->withHeaders(clinicStatefulHeaders($this->clinic))
-        ->postJson(tenantUrl($this->clinic, 'api/auth/login'), [
+        ->postJson(clinicApiUrl($this->clinic, 'api/auth/login'), [
             'username' => 'alice',
             'pin' => '9999',
         ])->assertUnauthorized()
@@ -66,7 +66,7 @@ it('returns 422 when PIN staff omits PIN', function () {
     ]);
 
     $this->withHeaders(clinicStatefulHeaders($this->clinic))
-        ->postJson(tenantUrl($this->clinic, 'api/auth/login'), [
+        ->postJson(clinicApiUrl($this->clinic, 'api/auth/login'), [
             'username' => 'alice',
         ])->assertUnprocessable()
         ->assertJsonValidationErrors(['pin']);
@@ -78,7 +78,7 @@ it('returns 422 when password staff omits password', function () {
     ]);
 
     $this->withHeaders(clinicStatefulHeaders($this->clinic))
-        ->postJson(tenantUrl($this->clinic, 'api/auth/login'), [
+        ->postJson(clinicApiUrl($this->clinic, 'api/auth/login'), [
             'username' => 'bob',
         ])->assertUnprocessable()
         ->assertJsonValidationErrors(['password']);
@@ -90,7 +90,7 @@ it('returns staff on valid password login without token', function () {
     ]);
 
     $this->withHeaders(clinicStatefulHeaders($this->clinic))
-        ->postJson(tenantUrl($this->clinic, 'api/auth/login'), [
+        ->postJson(clinicApiUrl($this->clinic, 'api/auth/login'), [
             'username' => 'bob',
             'password' => 'secret-pass',
         ])->assertOk()
@@ -106,7 +106,7 @@ it('returns clinic me when session cookie is present', function () {
     ]);
 
     $login = $this->withHeaders(clinicStatefulHeaders($this->clinic))
-        ->postJson(tenantUrl($this->clinic, 'api/auth/login'), [
+        ->postJson(clinicApiUrl($this->clinic, 'api/auth/login'), [
             'username' => 'alice',
             'pin' => '1111',
         ]);
@@ -116,7 +116,7 @@ it('returns clinic me when session cookie is present', function () {
     $this->withCredentials()
         ->withCookies(sessionCookiesFromResponse($login))
         ->withHeaders(clinicStatefulHeaders($this->clinic))
-        ->getJson(tenantUrl($this->clinic, 'api/auth/me'))
+        ->getJson(clinicApiUrl($this->clinic, 'api/auth/me'))
         ->assertOk()
         ->assertJsonPath('data.staff.username', 'alice');
 });
@@ -139,7 +139,7 @@ it('rejects clinic routes when only platform_session is authenticated', function
     $this->withCredentials()
         ->withCookies(sessionCookiesFromResponse($login))
         ->withHeaders(clinicStatefulHeaders($this->clinic))
-        ->getJson(tenantUrl($this->clinic, 'api/auth/me'))
+        ->getJson(clinicApiUrl($this->clinic, 'api/auth/me'))
         ->assertUnauthorized();
 });
 
@@ -151,7 +151,7 @@ it('logs out and clears clinic_session', function () {
     ]);
 
     $login = $this->withHeaders(clinicStatefulHeaders($this->clinic))
-        ->postJson(tenantUrl($this->clinic, 'api/auth/login'), [
+        ->postJson(clinicApiUrl($this->clinic, 'api/auth/login'), [
             'username' => 'alice',
             'pin' => '4242',
         ]);
@@ -163,7 +163,7 @@ it('logs out and clears clinic_session', function () {
     $this->withCredentials()
         ->withCookies($cookies)
         ->withHeaders(clinicStatefulHeaders($this->clinic))
-        ->postJson(tenantUrl($this->clinic, 'api/auth/logout'))
+        ->postJson(clinicApiUrl($this->clinic, 'api/auth/logout'))
         ->assertOk();
 
     $this->assertGuest('clinic_session');
@@ -171,7 +171,7 @@ it('logs out and clears clinic_session', function () {
     $this->withCredentials()
         ->withCookies($cookies)
         ->withHeaders(clinicStatefulHeaders($this->clinic))
-        ->getJson(tenantUrl($this->clinic, 'api/auth/me'))
+        ->getJson(clinicApiUrl($this->clinic, 'api/auth/me'))
         ->assertUnauthorized();
 });
 
@@ -189,7 +189,7 @@ it('switch-staff updates session and me returns target staff', function () {
     ]);
 
     $login = $this->withHeaders(clinicStatefulHeaders($this->clinic))
-        ->postJson(tenantUrl($this->clinic, 'api/auth/login'), [
+        ->postJson(clinicApiUrl($this->clinic, 'api/auth/login'), [
             'username' => 'alice',
             'pin' => '1111',
         ]);
@@ -200,7 +200,7 @@ it('switch-staff updates session and me returns target staff', function () {
     $switch = $this->withCredentials()
         ->withCookies($cookies)
         ->withHeaders(clinicStatefulHeaders($this->clinic))
-        ->postJson(tenantUrl($this->clinic, 'api/auth/switch-staff'), [
+        ->postJson(clinicApiUrl($this->clinic, 'api/auth/switch-staff'), [
             'username' => 'bob',
             'pin' => '8888',
         ]);
@@ -218,7 +218,7 @@ it('switch-staff updates session and me returns target staff', function () {
     $this->withCredentials()
         ->withCookies($cookiesAfterSwitch)
         ->withHeaders(clinicStatefulHeaders($this->clinic))
-        ->getJson(tenantUrl($this->clinic, 'api/auth/me'))
+        ->getJson(clinicApiUrl($this->clinic, 'api/auth/me'))
         ->assertOk()
         ->assertJsonPath('data.staff.username', 'bob');
 });
@@ -237,7 +237,7 @@ it('returns 401 when switch-staff PIN is wrong', function () {
     ]);
 
     $login = $this->withHeaders(clinicStatefulHeaders($this->clinic))
-        ->postJson(tenantUrl($this->clinic, 'api/auth/login'), [
+        ->postJson(clinicApiUrl($this->clinic, 'api/auth/login'), [
             'username' => 'alice',
             'pin' => '1111',
         ]);
@@ -247,8 +247,69 @@ it('returns 401 when switch-staff PIN is wrong', function () {
     $this->withCredentials()
         ->withCookies(sessionCookiesFromResponse($login))
         ->withHeaders(clinicStatefulHeaders($this->clinic))
-        ->postJson(tenantUrl($this->clinic, 'api/auth/switch-staff'), [
+        ->postJson(clinicApiUrl($this->clinic, 'api/auth/switch-staff'), [
             'username' => 'bob',
             'pin' => '0000',
         ])->assertUnauthorized();
+});
+
+it('returns 400 when X-Tenant-Slug header is missing on clinic routes', function () {
+    StaffMember::factory()->create([
+        'username' => 'alice',
+        'login_pin' => bcrypt('4242'),
+        'sign_in_method' => 'pin',
+    ]);
+
+    $this->withHeaders(['Referer' => tenantUrl($this->clinic, '/')])
+        ->postJson(clinicApiUrl($this->clinic, 'api/auth/login'), [
+            'username' => 'alice',
+            'pin' => '4242',
+        ])->assertStatus(400)
+        ->assertJsonPath('message', 'Missing X-Tenant-Slug header.');
+});
+
+it('returns 404 when X-Tenant-Slug does not match a clinic', function () {
+    StaffMember::factory()->create([
+        'username' => 'alice',
+        'login_pin' => bcrypt('4242'),
+        'sign_in_method' => 'pin',
+    ]);
+
+    $this->withHeaders([
+        'Referer' => tenantUrl($this->clinic, '/'),
+        'X-Tenant-Slug' => 'nonexistent-clinic-slug',
+    ])->postJson(clinicApiUrl($this->clinic, 'api/auth/login'), [
+        'username' => 'alice',
+        'pin' => '4242',
+    ])->assertNotFound()
+        ->assertJsonPath('message', 'Clinic not found.');
+});
+
+it('sets session cookie on valid clinic login with X-Tenant-Slug', function () {
+    StaffMember::factory()->create([
+        'username' => 'alice',
+        'login_pin' => bcrypt('4242'),
+        'sign_in_method' => 'pin',
+    ]);
+
+    $this->withHeaders(clinicStatefulHeaders($this->clinic))
+        ->postJson(clinicApiUrl($this->clinic, 'api/auth/login'), [
+            'username' => 'alice',
+            'pin' => '4242',
+        ])->assertOk()
+        ->assertCookie(config('session.cookie'));
+});
+
+it('allows platform login without X-Tenant-Slug', function () {
+    PlatformAdmin::query()->create([
+        'name' => 'Admin',
+        'email' => 'platform-no-header@example.com',
+        'password' => 'Secret123!',
+    ]);
+
+    $this->withHeaders(platformStatefulHeaders())
+        ->postJson('/api/platform/auth/login', [
+            'email' => 'platform-no-header@example.com',
+            'password' => 'Secret123!',
+        ])->assertOk();
 });

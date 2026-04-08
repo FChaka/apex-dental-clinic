@@ -1,14 +1,12 @@
 <?php
 
 use App\Http\Middleware\HandleInertiaRequests;
-use App\Http\Middleware\InitializeTenancyBySubdomainIfApplicable;
-use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
+use App\Http\Middleware\ResolveTenantFromHeader;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful;
-use Stancl\Tenancy\Middleware\InitializeTenancyBySubdomain;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -19,18 +17,9 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->api(prepend: [
-            InitializeTenancyBySubdomainIfApplicable::class,
+            ResolveTenantFromHeader::class,
             EnsureFrontendRequestsAreStateful::class,
         ]);
-
-        $middleware->alias([
-            'clinic.tenancy' => InitializeTenancyBySubdomain::class,
-        ]);
-
-        $middleware->prependToPriorityList(
-            AuthenticatesRequests::class,
-            InitializeTenancyBySubdomain::class,
-        );
 
         $middleware->web(append: [
             HandleInertiaRequests::class,

@@ -1,5 +1,7 @@
 <?php
 
+// DEPRECATED — replaced by ResolveTenantFromHeader. Safe to delete after confirming all routes work.
+
 declare(strict_types=1);
 
 namespace App\Http\Middleware;

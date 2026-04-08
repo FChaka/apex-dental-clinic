@@ -84,7 +84,7 @@ it('rejects platform me when only clinic_session is authenticated', function () 
     ]);
 
     $login = $this->withHeaders(clinicStatefulHeaders($clinic))
-        ->postJson(tenantUrl($clinic, 'api/auth/login'), [
+        ->postJson(clinicApiUrl($clinic, 'api/auth/login'), [
             'username' => 'alice',
             'pin' => '1111',
         ]);

@@ -5,6 +5,33 @@ use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Laravel\Sanctum\Http\Middleware\AuthenticateSession;
 use Laravel\Sanctum\Sanctum;
 
+$platformDomain = trim((string) env('APP_PLATFORM_DOMAIN', ''));
+
+/*
+ * Default stateful hosts when SANCTUM_STATEFUL_DOMAINS is unset.
+ * Wildcards cover every tenant SPA at {slug}.{APP_PLATFORM_DOMAIN} without listing each clinic.
+ */
+$defaultStatefulDomains = [
+    'localhost',
+    'localhost:3000',
+    'localhost:5173',
+    '127.0.0.1',
+    '127.0.0.1:8000',
+    '::1',
+    Sanctum::currentApplicationUrlWithPort(),
+    'api.localhost',
+    '*.localhost',
+    '*.localhost:5173',
+];
+
+if ($platformDomain !== '') {
+    $defaultStatefulDomains[] = $platformDomain;
+    $defaultStatefulDomains[] = 'api.'.$platformDomain;
+    $defaultStatefulDomains[] = '*.'.$platformDomain;
+}
+
+$sanctumStatefulDomains = env('SANCTUM_STATEFUL_DOMAINS');
+
 return [
 
     /*
@@ -18,17 +45,9 @@ return [
     |
     */
 
-    'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', implode(',', [
-        'localhost',
-        'localhost:3000',
-        'localhost:5173',
-        'testclinic.localhost',
-        'apex.com',
-        '127.0.0.1',
-        '127.0.0.1:8000',
-        '::1',
-        Sanctum::currentApplicationUrlWithPort(),
-    ]))),
+    'stateful' => $sanctumStatefulDomains !== null && $sanctumStatefulDomains !== ''
+        ? array_values(array_filter(array_map('trim', explode(',', (string) $sanctumStatefulDomains))))
+        : array_values(array_unique(array_filter(array_map('trim', $defaultStatefulDomains)))),
 
     /*
     |--------------------------------------------------------------------------

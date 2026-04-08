@@ -18,4 +18,14 @@ export default defineConfig({
     esbuild: {
         jsx: 'automatic',
     },
+    server: {
+        host: true,
+        proxy: {
+            // Same-origin API during Vite dev: cookies + CSRF work without cross-host XSRF issues. Preserves Host for tenant subdomains.
+            '^/(api|sanctum)': {
+                target: 'http://127.0.0.1:8000',
+                changeOrigin: false,
+            },
+        },
+    },
 });
