@@ -18,8 +18,11 @@ abstract class TenancyFeatureTestCase extends TestCase
         if (config('database.connections.central.driver') === 'sqlite') {
             $path = (string) config('database.connections.central.database');
 
-            if ($path !== ':memory:' && is_file($path)) {
-                @unlink($path);
+            if ($path !== ':memory:') {
+                if (is_file($path)) {
+                    @unlink($path);
+                }
+                touch($path);
             }
         }
 
