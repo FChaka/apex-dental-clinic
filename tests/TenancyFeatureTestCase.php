@@ -7,7 +7,7 @@ namespace Tests;
 use Illuminate\Contracts\Console\Kernel;
 
 /**
- * Feature tests that provision MySQL tenant databases: full central migrate:fresh each test (no RefreshDatabase static cache).
+ * Feature tests that provision tenant DBs (SQLite in testing, MySQL in local CI-style runs): central migrate:fresh each test.
  */
 abstract class TenancyFeatureTestCase extends TestCase
 {
@@ -27,8 +27,7 @@ abstract class TenancyFeatureTestCase extends TestCase
         }
 
         $this->artisan('migrate:fresh', array_merge($this->migrateFreshUsing(), [
-            '--path' => database_path('migrations/central'),
-            '--realpath' => true,
+            '--database' => 'central',
         ]));
         $this->app[Kernel::class]->setArtisan(null);
     }
