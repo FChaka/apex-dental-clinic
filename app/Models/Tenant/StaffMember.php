@@ -6,16 +6,14 @@ namespace App\Models\Tenant;
 
 use Database\Factories\Tenant\StaffMemberFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens;
 
 class StaffMember extends Authenticatable
 {
     /** @use HasFactory<StaffMemberFactory> */
-    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
+    use HasFactory, Notifiable, SoftDeletes;
 
     protected $table = 'staff_members';
 
@@ -65,14 +63,6 @@ class StaffMember extends Authenticatable
     public function getAuthPassword(): ?string
     {
         return $this->login_password;
-    }
-
-    /**
-     * @return MorphMany<PersonalAccessToken, $this>
-     */
-    public function tokens(): MorphMany
-    {
-        return $this->morphMany(PersonalAccessToken::class, 'tokenable');
     }
 
     protected static function newFactory(): StaffMemberFactory

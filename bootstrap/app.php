@@ -1,8 +1,8 @@
 <?php
 
-use App\Http\Middleware\ConfigureSanctumPersonalAccessTokenModel;
 use App\Http\Middleware\HandleInertiaRequests;
-use App\Http\Middleware\InitializeTenancyFromToken;
+use App\Http\Middleware\InitializeTenancyBySubdomainIfApplicable;
+use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -19,14 +19,18 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->api(prepend: [
+            InitializeTenancyBySubdomainIfApplicable::class,
             EnsureFrontendRequestsAreStateful::class,
         ]);
 
         $middleware->alias([
             'clinic.tenancy' => InitializeTenancyBySubdomain::class,
-            'tenancy.from_token' => InitializeTenancyFromToken::class,
-            'sanctum.pat' => ConfigureSanctumPersonalAccessTokenModel::class,
         ]);
+
+        $middleware->prependToPriorityList(
+            AuthenticatesRequests::class,
+            InitializeTenancyBySubdomain::class,
+        );
 
         $middleware->web(append: [
             HandleInertiaRequests::class,

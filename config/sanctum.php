@@ -18,30 +18,29 @@ return [
     |
     */
 
-    'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', sprintf(
-        '%s%s',
-        'localhost,localhost:3000,localhost:5173,127.0.0.1,127.0.0.1:8000,::1',
+    'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', implode(',', [
+        'localhost',
+        'localhost:3000',
+        'localhost:5173',
+        'testclinic.localhost',
+        'apex.com',
+        '127.0.0.1',
+        '127.0.0.1:8000',
+        '::1',
         Sanctum::currentApplicationUrlWithPort(),
-        // Sanctum::currentRequestHost(),
-    ))),
+    ]))),
 
     /*
     |--------------------------------------------------------------------------
     | Sanctum Guards
     |--------------------------------------------------------------------------
     |
-    | This array contains the authentication guards that will be checked when
-    | Sanctum is trying to authenticate a request. If none of these guards
-    | are able to authenticate the request, Sanctum will use the bearer
-    | token that's present on an incoming request for authentication.
+    | Session guards Sanctum checks for first-party SPA cookie authentication.
+    | API routes use auth:clinic_session and auth:platform_session explicitly.
     |
     */
 
-    /*
-     * Session guards checked before bearer tokens for first-party SPA cookie auth.
-     * Clinic/platform JSON APIs use PAT only; dedicated session guards are omitted so Bearer is not shadowed.
-     */
-    'guard' => ['web'],
+    'guard' => ['web', 'clinic_session', 'platform_session'],
 
     /*
     |--------------------------------------------------------------------------
@@ -54,7 +53,7 @@ return [
     |
     */
 
-    'expiration' => null,
+    'expiration' => 480,
 
     /*
     |--------------------------------------------------------------------------
@@ -77,8 +76,7 @@ return [
     |--------------------------------------------------------------------------
     |
     | When authenticating your first-party SPA with Sanctum you may need to
-    | customize some of the middleware Sanctum uses while processing the
-    | request. You may change the middleware listed below as required.
+    | customize the middleware Sanctum uses while processing the request.
     |
     */
 

@@ -10,6 +10,7 @@ use App\Models\Central\PlatformAdmin;
 use App\Support\JsonApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 
 /**
@@ -25,24 +26,26 @@ final class PlatformAuthController extends Controller
             return JsonApiResponse::unauthorized('Invalid credentials.');
         }
 
-        $plainToken = $admin->createToken('platform')->plainTextToken;
+        Auth::guard('platform_session')->login($admin);
+        $request->session()->regenerate();
 
         return JsonApiResponse::success([
-            'token' => $plainToken,
             'admin' => self::serializeAdmin($admin),
         ], 'Logged in successfully.');
     }
 
     public function logout(Request $request): JsonResponse
     {
-        $request->user('platform')?->currentAccessToken()?->delete();
+        Auth::guard('platform_session')->logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
 
         return JsonApiResponse::success(null, 'Logged out successfully.');
     }
 
     public function me(Request $request): JsonResponse
     {
-        $admin = $request->user('platform');
+        $admin = Auth::guard('platform_session')->user();
 
         if (! $admin instanceof PlatformAdmin) {
             return JsonApiResponse::unauthorized();

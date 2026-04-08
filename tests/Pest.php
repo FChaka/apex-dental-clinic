@@ -3,11 +3,12 @@
 declare(strict_types=1);
 
 use App\Models\Central\Clinic;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
-use Stancl\Tenancy\Database\DatabaseManager;
-use Stancl\Tenancy\Jobs\CreateDatabase;
+use Illuminate\Testing\TestResponse;
 use Tests\TenancyFeatureTestCase;
+
+/** @var array<int, Clinic> */
+$__tenantsToDrop = [];
 
 /*
 |--------------------------------------------------------------------------
@@ -38,8 +39,16 @@ expect()->extend('toBeOne', function () {
 
 function createTestTenant(?string $slug = null): Clinic
 {
+    global $__tenantsToDrop;
+
     $slug ??= 't'.str_replace('.', '', uniqid('', true));
     $dbName = 'apex_clinic_'.str_replace('-', '_', $slug);
+
+    // Pre-cleanup: remove leftover DB file from a crashed prior run
+    $dbPath = database_path($dbName);
+    if (is_file($dbPath)) {
+        @unlink($dbPath);
+    }
 
     $clinic = Clinic::query()->create([
         'name' => 'Test Clinic',
@@ -53,24 +62,7 @@ function createTestTenant(?string $slug = null): Clinic
         'domain' => $slug,
     ]);
 
-    $databaseManager = app(DatabaseManager::class);
-
-    (new CreateDatabase($clinic))->handle($databaseManager);
-
-    tenancy()->initialize($clinic);
-
-    foreach ([
-        database_path('migrations/tenant/2026_04_03_210006_create_staff_members_table.php'),
-        database_path('migrations/tenant/2026_04_04_210029_create_personal_access_tokens_table.php'),
-    ] as $path) {
-        Artisan::call('migrate', [
-            '--path' => $path,
-            '--realpath' => true,
-            '--force' => true,
-        ]);
-    }
-
-    tenancy()->end();
+    $__tenantsToDrop[] = $clinic;
 
     return $clinic->fresh() ?? $clinic;
 }
@@ -88,10 +80,68 @@ function tenantUrl(Clinic $clinic, string $path): string
     return 'http://'.tenantHttpHost($clinic).'/'.ltrim($path, '/');
 }
 
+/**
+ * Referer header so Sanctum's EnsureFrontendRequestsAreStateful applies the session stack.
+ *
+ * @return array<string, string>
+ */
+function clinicStatefulHeaders(Clinic $clinic): array
+{
+    return ['Referer' => tenantUrl($clinic, '/')];
+}
+
+/**
+ * @return array<string, string>
+ */
+function platformStatefulHeaders(): array
+{
+    return ['Referer' => rtrim((string) config('app.url'), '/').'/'];
+}
+
+/**
+ * @return array<string, string>
+ */
+function sessionCookiesFromResponse(TestResponse $response): array
+{
+    $cookie = $response->getCookie(config('session.cookie'));
+
+    if ($cookie === null) {
+        return [];
+    }
+
+    return [$cookie->getName() => $cookie->getValue()];
+}
+
 function dropTenantDatabaseIfExists(Clinic $clinic): void
 {
     tenancy()->end();
 
     $name = str_replace('`', '', $clinic->database()->getName());
+    $driver = (string) config('database.connections.'.config('tenancy.database.template_tenant_connection').'.driver');
+
+    if ($driver === 'sqlite') {
+        $path = database_path($name);
+
+        if (is_file($path)) {
+            @unlink($path);
+        }
+
+        return;
+    }
+
     DB::connection('mysql')->statement('DROP DATABASE IF EXISTS `'.$name.'`');
 }
+
+afterEach(function () {
+    global $__tenantsToDrop;
+
+    foreach (array_reverse($__tenantsToDrop) as $clinic) {
+        try {
+            dropTenantDatabaseIfExists($clinic);
+        } catch (\Throwable) {
+            // Best-effort cleanup; tests should still fail on assertions, not cleanup.
+        }
+    }
+
+    $__tenantsToDrop = [];
+});

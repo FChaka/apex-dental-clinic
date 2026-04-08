@@ -7,14 +7,13 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\ClinicLoginRequest;
 use App\Http\Requests\Auth\ClinicSwitchStaffRequest;
-use App\Models\Central\Clinic;
 use App\Models\Tenant\StaffMember;
 use App\Services\Auth\ClinicAuthService;
-use App\Support\ClinicSanctumTokenBinding;
 use App\Support\JsonApiResponse;
 use App\Support\StaffPermissions;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -48,13 +47,10 @@ final class ClinicAuthController extends Controller
             return JsonApiResponse::unauthorized('Invalid credentials.');
         }
 
-        /** @var Clinic $clinic */
-        $clinic = tenant();
-
-        $plainToken = $staff->createToken(ClinicSanctumTokenBinding::tokenNameForClinic($clinic))->plainTextToken;
+        Auth::guard('clinic_session')->login($staff);
+        $request->session()->regenerate();
 
         return JsonApiResponse::success([
-            'token' => $plainToken,
             'staff' => self::serializeStaff($staff),
             'permissions' => StaffPermissions::forStaff($staff),
         ], 'Logged in successfully.');
@@ -62,14 +58,16 @@ final class ClinicAuthController extends Controller
 
     public function logout(Request $request): JsonResponse
     {
-        $request->user('clinic')?->currentAccessToken()?->delete();
+        Auth::guard('clinic_session')->logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
 
         return JsonApiResponse::success(null, 'Logged out successfully.');
     }
 
     public function me(Request $request): JsonResponse
     {
-        $staff = $request->user('clinic');
+        $staff = Auth::guard('clinic_session')->user();
 
         if (! $staff instanceof StaffMember) {
             return JsonApiResponse::unauthorized();
@@ -93,16 +91,10 @@ final class ClinicAuthController extends Controller
             return JsonApiResponse::unauthorized('Invalid PIN.');
         }
 
-        $current = $request->user('clinic');
-        $current?->currentAccessToken()?->delete();
-
-        /** @var Clinic $clinic */
-        $clinic = tenant();
-
-        $plainToken = $target->createToken(ClinicSanctumTokenBinding::tokenNameForClinic($clinic))->plainTextToken;
+        Auth::guard('clinic_session')->login($target);
+        $request->session()->regenerate();
 
         return JsonApiResponse::success([
-            'token' => $plainToken,
             'staff' => self::serializeStaff($target),
             'permissions' => StaffPermissions::forStaff($target),
         ], 'Switched staff successfully.');

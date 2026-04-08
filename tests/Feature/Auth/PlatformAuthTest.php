@@ -4,28 +4,35 @@ declare(strict_types=1);
 
 use App\Models\Central\PlatformAdmin;
 use App\Models\Tenant\StaffMember;
-use App\Support\ClinicSanctumTokenBinding;
 
 afterEach(function () {
     tenancy()->end();
 });
 
-it('returns a token on valid platform login', function () {
+beforeEach(function () {
+    $this->withCredentials();
+});
+
+it('returns admin on valid platform login without token', function () {
     PlatformAdmin::query()->create([
         'name' => 'Admin',
         'email' => 'admin@example.com',
         'password' => 'Secret123!',
     ]);
 
-    $this->postJson('/api/platform/auth/login', [
-        'email' => 'admin@example.com',
-        'password' => 'Secret123!',
-    ])->assertOk()
+    $this->withHeaders(platformStatefulHeaders())
+        ->postJson('/api/platform/auth/login', [
+            'email' => 'admin@example.com',
+            'password' => 'Secret123!',
+        ])->assertOk()
+        ->assertJsonMissingPath('data.token')
         ->assertJsonStructure([
-            'data' => ['token', 'admin'],
+            'data' => ['admin'],
             'message',
         ])
         ->assertJsonPath('data.admin.email', 'admin@example.com');
+
+    $this->assertAuthenticated('platform_session');
 });
 
 it('returns 401 on invalid platform credentials', function () {
@@ -35,56 +42,70 @@ it('returns 401 on invalid platform credentials', function () {
         'password' => 'Secret123!',
     ]);
 
-    $this->postJson('/api/platform/auth/login', [
-        'email' => 'admin@example.com',
-        'password' => 'wrong-password',
-    ])->assertUnauthorized()
+    $this->withHeaders(platformStatefulHeaders())
+        ->postJson('/api/platform/auth/login', [
+            'email' => 'admin@example.com',
+            'password' => 'wrong-password',
+        ])->assertUnauthorized()
         ->assertJsonPath('data', null);
 });
 
-it('returns platform me for a valid platform bearer token', function () {
-    $admin = PlatformAdmin::query()->create([
+it('returns platform me when session cookie is present', function () {
+    PlatformAdmin::query()->create([
         'name' => 'Admin',
         'email' => 'admin@example.com',
         'password' => 'Secret123!',
     ]);
 
-    $plain = $admin->createToken('platform')->plainTextToken;
+    $login = $this->withHeaders(platformStatefulHeaders())
+        ->postJson('/api/platform/auth/login', [
+            'email' => 'admin@example.com',
+            'password' => 'Secret123!',
+        ]);
 
-    $this->withHeaders([
-        'Authorization' => 'Bearer '.$plain,
-        'Accept' => 'application/json',
-    ])->getJson('/api/platform/auth/me')
+    $login->assertOk();
+
+    $this->withCredentials()
+        ->withCookies(sessionCookiesFromResponse($login))
+        ->withHeaders(platformStatefulHeaders())
+        ->getJson('/api/platform/auth/me')
         ->assertOk()
         ->assertJsonPath('data.admin.email', 'admin@example.com');
 });
 
-it('rejects platform me with a clinic bearer token', function () {
+it('rejects platform me when only clinic_session is authenticated', function () {
     $clinic = createTestTenant();
     tenancy()->initialize($clinic);
 
-    $staff = StaffMember::factory()->create([
+    StaffMember::factory()->create([
         'username' => 'alice',
         'login_pin' => bcrypt('1111'),
         'sign_in_method' => 'pin',
     ]);
 
-    $plain = $staff->createToken(ClinicSanctumTokenBinding::tokenNameForClinic($clinic))->plainTextToken;
+    $login = $this->withHeaders(clinicStatefulHeaders($clinic))
+        ->postJson(tenantUrl($clinic, 'api/auth/login'), [
+            'username' => 'alice',
+            'pin' => '1111',
+        ]);
+
+    $login->assertOk();
 
     tenancy()->end();
 
-    $this->withHeaders([
-        'Authorization' => 'Bearer '.$plain,
-        'Accept' => 'application/json',
-    ])->getJson('/api/platform/auth/me')
+    $this->withCredentials()
+        ->withCookies(sessionCookiesFromResponse($login))
+        ->withHeaders(platformStatefulHeaders())
+        ->getJson('/api/platform/auth/me')
         ->assertUnauthorized();
 
     dropTenantDatabaseIfExists($clinic);
 });
 
 it('returns 422 when platform login validation fails', function () {
-    $this->postJson('/api/platform/auth/login', [
-        'email' => 'not-an-email',
-    ])->assertUnprocessable()
+    $this->withHeaders(platformStatefulHeaders())
+        ->postJson('/api/platform/auth/login', [
+            'email' => 'not-an-email',
+        ])->assertUnprocessable()
         ->assertJsonValidationErrors(['email', 'password']);
 });

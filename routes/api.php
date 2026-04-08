@@ -16,15 +16,15 @@ Route::prefix('auth')->name('api.auth.')->group(function () {
         ->name('login');
 
     Route::post('logout', [ClinicAuthController::class, 'logout'])
-        ->middleware(['clinic.tenancy', 'sanctum.pat:clinic', 'auth:clinic', 'tenancy.from_token'])
+        ->middleware(['clinic.tenancy', 'auth:clinic_session'])
         ->name('logout');
 
     Route::get('me', [ClinicAuthController::class, 'me'])
-        ->middleware(['clinic.tenancy', 'sanctum.pat:clinic', 'auth:clinic', 'tenancy.from_token'])
+        ->middleware(['clinic.tenancy', 'auth:clinic_session'])
         ->name('me');
 
     Route::post('switch-staff', [ClinicAuthController::class, 'switchStaff'])
-        ->middleware(['clinic.tenancy', 'sanctum.pat:clinic', 'auth:clinic', 'tenancy.from_token'])
+        ->middleware(['clinic.tenancy', 'auth:clinic_session'])
         ->name('switch-staff');
 });
 
@@ -32,10 +32,10 @@ Route::prefix('platform/auth')->name('api.platform.auth.')->group(function () {
     Route::post('login', [PlatformAuthController::class, 'login'])->name('login');
 
     Route::post('logout', [PlatformAuthController::class, 'logout'])
-        ->middleware(['sanctum.pat:platform', 'auth:platform'])
+        ->middleware('auth:platform_session')
         ->name('logout');
 
     Route::get('me', [PlatformAuthController::class, 'me'])
-        ->middleware(['sanctum.pat:platform', 'auth:platform'])
+        ->middleware('auth:platform_session')
         ->name('me');
 });

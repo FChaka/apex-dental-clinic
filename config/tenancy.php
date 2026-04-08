@@ -56,7 +56,7 @@ return [
          * Connection used as a "template" for the dynamically created tenant database connection.
          * Note: don't name your template connection tenant. That name is reserved by package.
          */
-        'template_tenant_connection' => 'mysql',
+        'template_tenant_connection' => env('TENANT_DB_TEMPLATE_CONNECTION', 'mysql'),
 
         /**
          * Overridden by AppServiceProvider via DatabaseConfig::generateDatabaseNamesUsing

@@ -47,14 +47,16 @@ return [
          * Tenant-aware models must use $connection = 'central' or run inside tenancy context.
          */
         'central' => [
-            'driver' => 'mysql',
+            'driver' => env('CENTRAL_DB_DRIVER', 'mysql'),
             'url' => env('DB_URL'),
-            'host' => env('DB_HOST', '127.0.0.1'),
-            'port' => env('DB_PORT', '3306'),
-            'database' => env('DB_DATABASE', 'apex_central'),
-            'username' => env('DB_USERNAME', 'root'),
-            'password' => env('DB_PASSWORD', ''),
-            'unix_socket' => env('DB_SOCKET', ''),
+            'host' => env('CENTRAL_DB_DRIVER', 'mysql') === 'sqlite' ? 'localhost' : env('CENTRAL_DB_HOST', env('DB_HOST', '127.0.0.1')),
+            'port' => env('CENTRAL_DB_DRIVER', 'mysql') === 'sqlite' ? null : env('CENTRAL_DB_PORT', env('DB_PORT', '3306')),
+            'database' => env('CENTRAL_DB_DRIVER', 'mysql') === 'sqlite'
+                ? database_path(env('CENTRAL_DB_DATABASE', 'database.sqlite'))
+                : env('CENTRAL_DB_DATABASE', env('DB_DATABASE', 'apex_central')),
+            'username' => env('CENTRAL_DB_DRIVER', 'mysql') === 'sqlite' ? '' : env('CENTRAL_DB_USERNAME', env('DB_USERNAME', 'root')),
+            'password' => env('CENTRAL_DB_DRIVER', 'mysql') === 'sqlite' ? '' : env('CENTRAL_DB_PASSWORD', env('DB_PASSWORD', '')),
+            'unix_socket' => env('CENTRAL_DB_DRIVER', 'mysql') === 'sqlite' ? '' : env('CENTRAL_DB_SOCKET', env('DB_SOCKET', '')),
             'charset' => env('DB_CHARSET', 'utf8mb4'),
             'collation' => env('DB_COLLATION', 'utf8mb4_unicode_ci'),
             'prefix' => '',
