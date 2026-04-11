@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\Clinic\SwitchStaffController;
 use App\Http\Controllers\Auth\ClinicAuthController;
 use App\Http\Controllers\Auth\PlatformAuthController;
 use Illuminate\Support\Facades\Route;
@@ -22,9 +23,13 @@ Route::prefix('auth')->name('api.auth.')->group(function () {
         ->middleware('auth:clinic_session')
         ->name('me');
 
-    Route::post('switch-staff', [ClinicAuthController::class, 'switchStaff'])
+    Route::post('switch-staff', [SwitchStaffController::class, 'switchStaff'])
         ->middleware('auth:clinic_session')
         ->name('switch-staff');
+
+    Route::post('switch-staff/verify', [SwitchStaffController::class, 'verify'])
+        ->middleware('auth:clinic_session')
+        ->name('switch-staff.verify');
 });
 
 Route::prefix('platform/auth')->name('api.platform.auth.')->group(function () {
