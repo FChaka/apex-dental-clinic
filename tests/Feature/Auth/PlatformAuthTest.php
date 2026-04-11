@@ -102,6 +102,35 @@ it('rejects platform me when only clinic_session is authenticated', function () 
     dropTenantDatabaseIfExists($clinic);
 });
 
+it('logs out and clears platform_session', function () {
+    PlatformAdmin::query()->create([
+        'name' => 'Admin',
+        'email' => 'admin@example.com',
+        'password' => 'Secret123!',
+    ]);
+
+    $login = $this->withHeaders(platformStatefulHeaders())
+        ->postJson('/api/platform/auth/login', [
+            'email' => 'admin@example.com',
+            'password' => 'Secret123!',
+        ]);
+
+    $login->assertOk();
+
+    $cookies = sessionCookiesFromResponse($login);
+    $sessionId = $cookies[config('session.cookie')] ?? null;
+
+    expect($sessionId)->not->toBeEmpty();
+
+    $this->withCredentials()
+        ->withCookies($cookies)
+        ->withHeaders(platformStatefulHeaders())
+        ->postJson('/api/platform/auth/logout')
+        ->assertOk();
+
+    $this->assertGuest('platform_session');
+});
+
 it('returns 422 when platform login validation fails', function () {
     $this->withHeaders(platformStatefulHeaders())
         ->postJson('/api/platform/auth/login', [

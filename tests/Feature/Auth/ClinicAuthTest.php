@@ -159,6 +159,9 @@ it('logs out and clears clinic_session', function () {
     $login->assertOk();
 
     $cookies = sessionCookiesFromResponse($login);
+    $sessionId = $cookies[config('session.cookie')] ?? null;
+
+    expect($sessionId)->not->toBeEmpty();
 
     $this->withCredentials()
         ->withCookies($cookies)
