@@ -6,7 +6,6 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\ClinicLoginRequest;
-use App\Http\Requests\Auth\ClinicSwitchStaffRequest;
 use App\Models\Tenant\StaffMember;
 use App\Services\Auth\ClinicAuthService;
 use App\Support\JsonApiResponse;
@@ -77,27 +76,6 @@ final class ClinicAuthController extends Controller
             'staff' => self::serializeStaff($staff),
             'permissions' => StaffPermissions::forStaff($staff),
         ], 'OK');
-    }
-
-    public function switchStaff(ClinicSwitchStaffRequest $request, ClinicAuthService $auth): JsonResponse
-    {
-        $target = $auth->findStaffByUsername($request->validated('username'));
-
-        if ($target === null) {
-            return JsonApiResponse::unauthorized('Invalid credentials.');
-        }
-
-        if (! $auth->verifyPinForStaff($target, $request->validated('pin'))) {
-            return JsonApiResponse::unauthorized('Invalid PIN.');
-        }
-
-        Auth::guard('clinic_session')->login($target);
-        $request->session()->regenerate();
-
-        return JsonApiResponse::success([
-            'staff' => self::serializeStaff($target),
-            'permissions' => StaffPermissions::forStaff($target),
-        ], 'Switched staff successfully.');
     }
 
     /**
