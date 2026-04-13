@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 namespace App\Models\Tenant;
 
+use Database\Factories\Tenant\AppointmentFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Appointment extends Model
 {
+    /** @use HasFactory<AppointmentFactory> */
+    use HasFactory;
+
     protected $table = 'appointments';
 
     /**
@@ -28,6 +33,7 @@ class Appointment extends Model
     {
         return [
             'date' => 'date',
+            'time' => 'string',
         ];
     }
 
@@ -39,5 +45,10 @@ class Appointment extends Model
     public function dentist(): BelongsTo
     {
         return $this->belongsTo(StaffMember::class, 'dentist_id');
+    }
+
+    protected static function newFactory(): AppointmentFactory
+    {
+        return AppointmentFactory::new();
     }
 }
