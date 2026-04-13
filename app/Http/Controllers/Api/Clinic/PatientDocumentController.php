@@ -10,6 +10,7 @@ use App\Models\Tenant\Patient;
 use App\Models\Tenant\PatientDocument;
 use App\Services\DataScopeService;
 use App\Support\JsonApiResponse;
+use App\Support\TenantPatientStoragePaths;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -64,15 +65,13 @@ final class PatientDocumentController extends Controller
             'type' => ['required', 'string', 'max:50'],
         ]);
 
-        $slug = (string) tenancy()->tenant->slug;
         $file = $validated['file'];
         $extension = $file->getClientOriginalExtension() ?: 'bin';
         $storedName = Str::uuid()->toString().'.'.$extension;
-        $relativePath = "tenants/{$slug}/patients/{$patient->id}/documents/{$storedName}";
 
         $disk = config('filesystems.default');
         $storedPath = $file->storeAs(
-            "tenants/{$slug}/patients/{$patient->id}/documents",
+            TenantPatientStoragePaths::documentsDirectory($patient),
             $storedName,
             ['disk' => $disk]
         );
