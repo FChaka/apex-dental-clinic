@@ -20,6 +20,13 @@ pest()->extend(TenancyFeatureTestCase::class)->in(
     'Feature/Auth/ClinicAuthTest.php',
     'Feature/Auth/PlatformAuthTest.php',
     'Feature/Auth/SwitchStaffTest.php',
+    'Feature/Patients/PatientCrudTest.php',
+    'Feature/Patients/PatientMedicalHistoryTest.php',
+    'Feature/Patients/PatientAnamnesisTest.php',
+    'Feature/Patients/PatientTeethChartTest.php',
+    'Feature/Patients/PatientDocumentTest.php',
+    'Feature/Patients/PatientMonthlyPlanTest.php',
+    'Feature/Patients/PatientInsightsTest.php',
 );
 
 /*
