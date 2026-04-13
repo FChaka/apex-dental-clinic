@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support;
 
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -17,6 +18,23 @@ final class JsonApiResponse
             'data' => $data,
             'message' => $message,
         ], $status);
+    }
+
+    /**
+     * @param  LengthAwarePaginator<int, mixed>  $paginator
+     */
+    public static function paginated(LengthAwarePaginator $paginator, string $message = 'OK'): JsonResponse
+    {
+        return response()->json([
+            'data' => $paginator->items(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+            'message' => $message,
+        ]);
     }
 
     public static function unauthorized(string $message = 'Unauthenticated.'): JsonResponse
