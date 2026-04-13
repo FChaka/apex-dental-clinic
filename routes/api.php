@@ -1,14 +1,19 @@
 <?php
 
 use App\Http\Controllers\Api\Clinic\AppointmentController;
+use App\Http\Controllers\Api\Clinic\InvoiceController;
 use App\Http\Controllers\Api\Clinic\PatientAnamnesisController;
 use App\Http\Controllers\Api\Clinic\PatientController;
 use App\Http\Controllers\Api\Clinic\PatientDocumentController;
 use App\Http\Controllers\Api\Clinic\PatientInsightsController;
 use App\Http\Controllers\Api\Clinic\PatientMedicalHistoryController;
 use App\Http\Controllers\Api\Clinic\PatientMonthlyPlanController;
+use App\Http\Controllers\Api\Clinic\PatientPaymentRecordController;
 use App\Http\Controllers\Api\Clinic\PatientTeethChartController;
+use App\Http\Controllers\Api\Clinic\PatientTreatmentEntryController;
 use App\Http\Controllers\Api\Clinic\SwitchStaffController;
+use App\Http\Controllers\Api\Clinic\TreatmentRecordController;
+use App\Http\Controllers\Api\Clinic\TreatmentTypeController;
 use App\Http\Controllers\Auth\ClinicAuthController;
 use App\Http\Controllers\Auth\PlatformAuthController;
 use Illuminate\Support\Facades\Route;
@@ -41,13 +46,29 @@ Route::prefix('auth')->name('api.auth.')->group(function () {
 });
 
 Route::middleware('auth:clinic_session')->group(function () {
-    //Appointment Routes
+    // Appointment Routes
     Route::get('/appointments', [AppointmentController::class, 'index'])->name('api.appointments.index');
     Route::post('/appointments', [AppointmentController::class, 'store'])->name('api.appointments.store');
     Route::put('/appointments/{appointment}', [AppointmentController::class, 'update'])->name('api.appointments.update');
     Route::delete('/appointments/{appointment}', [AppointmentController::class, 'destroy'])->name('api.appointments.destroy');
 
-    //Patient Routes
+    Route::get('/treatment-types', [TreatmentTypeController::class, 'index'])->name('api.treatment-types.index');
+    Route::post('/treatment-types', [TreatmentTypeController::class, 'store'])->name('api.treatment-types.store');
+    Route::put('/treatment-types/{type}', [TreatmentTypeController::class, 'update'])->name('api.treatment-types.update');
+    Route::delete('/treatment-types/{type}', [TreatmentTypeController::class, 'destroy'])->name('api.treatment-types.destroy');
+
+    Route::get('/treatment-records', [TreatmentRecordController::class, 'index'])->name('api.treatment-records.index');
+    Route::post('/treatment-records', [TreatmentRecordController::class, 'store'])->name('api.treatment-records.store');
+    Route::put('/treatment-records/{record}', [TreatmentRecordController::class, 'update'])->name('api.treatment-records.update');
+    Route::delete('/treatment-records/{record}', [TreatmentRecordController::class, 'destroy'])->name('api.treatment-records.destroy');
+
+    Route::get('/invoices', [InvoiceController::class, 'index'])->name('api.invoices.index');
+    Route::post('/invoices', [InvoiceController::class, 'store'])->name('api.invoices.store');
+    Route::get('/invoices/{invoice}/pdf', [InvoiceController::class, 'pdf'])->name('api.invoices.pdf');
+    Route::get('/invoices/{invoice}', [InvoiceController::class, 'show'])->name('api.invoices.show');
+    Route::put('/invoices/{invoice}', [InvoiceController::class, 'update'])->name('api.invoices.update');
+
+    // Patient Routes
     Route::get('/patients', [PatientController::class, 'index'])->name('api.patients.index');
     Route::post('/patients', [PatientController::class, 'store'])->name('api.patients.store');
     Route::get('/patients/{patient}', [PatientController::class, 'show'])->name('api.patients.show');
@@ -86,6 +107,22 @@ Route::middleware('auth:clinic_session')->group(function () {
 
     Route::get('/patients/{patient}/insights', [PatientInsightsController::class, 'show'])
         ->name('api.patients.insights.show');
+
+    Route::get('/patients/{patient}/treatments', [PatientTreatmentEntryController::class, 'index'])
+        ->name('api.patients.treatments.index');
+    Route::post('/patients/{patient}/treatments', [PatientTreatmentEntryController::class, 'store'])
+        ->name('api.patients.treatments.store');
+    Route::put('/patients/{patient}/treatments/{entry}', [PatientTreatmentEntryController::class, 'update'])
+        ->name('api.patients.treatments.update');
+    Route::delete('/patients/{patient}/treatments/{entry}', [PatientTreatmentEntryController::class, 'destroy'])
+        ->name('api.patients.treatments.destroy');
+
+    Route::get('/patients/{patient}/payments', [PatientPaymentRecordController::class, 'index'])
+        ->name('api.patients.payments.index');
+    Route::post('/patients/{patient}/payments', [PatientPaymentRecordController::class, 'store'])
+        ->name('api.patients.payments.store');
+    Route::delete('/patients/{patient}/payments/{payment}', [PatientPaymentRecordController::class, 'destroy'])
+        ->name('api.patients.payments.destroy');
 });
 
 Route::prefix('platform/auth')->name('api.platform.auth.')->group(function () {

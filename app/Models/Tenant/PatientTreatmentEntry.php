@@ -4,11 +4,17 @@ declare(strict_types=1);
 
 namespace App\Models\Tenant;
 
+use Database\Factories\Tenant\PatientTreatmentEntryFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class PatientTreatmentEntry extends Model
 {
+    /** @use HasFactory<PatientTreatmentEntryFactory> */
+    use HasFactory;
+
     protected $table = 'patient_treatment_entries';
 
     /**
@@ -47,5 +53,27 @@ class PatientTreatmentEntry extends Model
     public function dentist(): BelongsTo
     {
         return $this->belongsTo(StaffMember::class, 'dentist_id');
+    }
+
+    public function invoiceItems(): HasMany
+    {
+        return $this->hasMany(InvoiceTreatmentEntry::class, 'treatment_entry_id');
+    }
+
+    public function paymentRecords(): HasMany
+    {
+        return $this->hasMany(PatientPaymentRecord::class, 'treatment_id');
+    }
+
+    public function syncPaymentStatusFromAmounts(): void
+    {
+        $price = (float) $this->price;
+        $paid = (float) $this->amount_paid;
+        $this->payment_status = $paid >= $price ? 'Paid' : 'Pending';
+    }
+
+    protected static function newFactory(): PatientTreatmentEntryFactory
+    {
+        return PatientTreatmentEntryFactory::new();
     }
 }

@@ -6,6 +6,7 @@ use App\Models\Central\Clinic;
 use App\Models\Tenant\Patient;
 use App\Models\Tenant\PatientDocument;
 use App\Models\Tenant\StaffMember;
+use App\Support\TenantPatientStoragePaths;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
@@ -26,12 +27,13 @@ afterEach(function () {
 });
 
 it('lists patient documents', function () {
+    $segment = TenantPatientStoragePaths::patientDirectorySegment($this->patient);
     PatientDocument::query()->create([
         'patient_id' => $this->patient->id,
         'name' => 'Doc',
         'file_name' => 'a.pdf',
         'type' => 'application/pdf',
-        'file_path' => 'tenants/test-clinic/patients/'.$this->patient->id.'/documents/x.pdf',
+        'file_path' => "tenants/test-clinic/patients/{$segment}/documents/x.pdf",
     ]);
 
     $this->actingAs($this->admin, 'clinic_session')
@@ -67,7 +69,8 @@ it('uploads a patient document', function () {
 it('deletes document and file', function () {
     Storage::fake(config('filesystems.default'));
     $disk = config('filesystems.default');
-    $path = "tenants/test-clinic/patients/{$this->patient->id}/documents/keep.pdf";
+    $segment = TenantPatientStoragePaths::patientDirectorySegment($this->patient);
+    $path = "tenants/test-clinic/patients/{$segment}/documents/keep.pdf";
     Storage::disk($disk)->put($path, 'binary');
 
     $doc = PatientDocument::query()->create([

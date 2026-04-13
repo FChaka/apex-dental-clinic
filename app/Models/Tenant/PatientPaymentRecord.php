@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 namespace App\Models\Tenant;
 
+use Database\Factories\Tenant\PatientPaymentRecordFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PatientPaymentRecord extends Model
 {
+    /** @use HasFactory<PatientPaymentRecordFactory> */
+    use HasFactory;
+
     protected $table = 'patient_payment_records';
 
     /**
@@ -40,5 +45,25 @@ class PatientPaymentRecord extends Model
     public function patient(): BelongsTo
     {
         return $this->belongsTo(Patient::class, 'patient_id');
+    }
+
+    public function treatment(): BelongsTo
+    {
+        return $this->belongsTo(PatientTreatmentEntry::class, 'treatment_id');
+    }
+
+    public function invoice(): BelongsTo
+    {
+        return $this->belongsTo(Invoice::class, 'invoice_id');
+    }
+
+    public function monthlyPlan(): BelongsTo
+    {
+        return $this->belongsTo(PatientMonthlyPlan::class, 'monthly_plan_id');
+    }
+
+    protected static function newFactory(): PatientPaymentRecordFactory
+    {
+        return PatientPaymentRecordFactory::new();
     }
 }
