@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\Clinic\AppointmentController;
 use App\Http\Controllers\Api\Clinic\PatientAnamnesisController;
 use App\Http\Controllers\Api\Clinic\PatientController;
 use App\Http\Controllers\Api\Clinic\PatientDocumentController;
@@ -40,6 +41,13 @@ Route::prefix('auth')->name('api.auth.')->group(function () {
 });
 
 Route::middleware('auth:clinic_session')->group(function () {
+    //Appointment Routes
+    Route::get('/appointments', [AppointmentController::class, 'index'])->name('api.appointments.index');
+    Route::post('/appointments', [AppointmentController::class, 'store'])->name('api.appointments.store');
+    Route::put('/appointments/{appointment}', [AppointmentController::class, 'update'])->name('api.appointments.update');
+    Route::delete('/appointments/{appointment}', [AppointmentController::class, 'destroy'])->name('api.appointments.destroy');
+
+    //Patient Routes
     Route::get('/patients', [PatientController::class, 'index'])->name('api.patients.index');
     Route::post('/patients', [PatientController::class, 'store'])->name('api.patients.store');
     Route::get('/patients/{patient}', [PatientController::class, 'show'])->name('api.patients.show');

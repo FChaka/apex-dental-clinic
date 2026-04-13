@@ -20,6 +20,15 @@ final class DataScopeService
         return $query;
     }
 
+    public function scopeAppointments(Builder $query, StaffMember $staff): Builder
+    {
+        if ($staff->clinic_access_level === 'staff') {
+            $query->where('dentist_id', $staff->id);
+        }
+
+        return $query;
+    }
+
     public function canAccessPatient(StaffMember $staff, Patient $patient): bool
     {
         if (in_array($staff->clinic_access_level, ['super_admin', 'admin'], true)) {
