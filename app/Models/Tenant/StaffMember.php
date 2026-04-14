@@ -6,6 +6,7 @@ namespace App\Models\Tenant;
 
 use Database\Factories\Tenant\StaffMemberFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -34,6 +35,8 @@ class StaffMember extends Authenticatable
         'username',
         'sign_in_method',
         'pin_length',
+        'login_pin',
+        'login_password',
         'color',
         'annual_leave_days',
         'leave_start',
@@ -52,6 +55,7 @@ class StaffMember extends Authenticatable
     protected function casts(): array
     {
         return [
+            'login_pin' => 'hashed',
             'login_password' => 'hashed',
             'paid_by_percentage' => 'boolean',
             'leave_start' => 'date',
@@ -59,6 +63,30 @@ class StaffMember extends Authenticatable
             'pin_length' => 'integer',
             'annual_leave_days' => 'integer',
         ];
+    }
+
+    /**
+     * @return HasMany<StaffWorkingSchedule, $this>
+     */
+    public function workingSchedules(): HasMany
+    {
+        return $this->hasMany(StaffWorkingSchedule::class, 'staff_id');
+    }
+
+    /**
+     * @return HasMany<StaffDocument, $this>
+     */
+    public function documents(): HasMany
+    {
+        return $this->hasMany(StaffDocument::class, 'staff_id');
+    }
+
+    /**
+     * @return HasMany<StaffPercentagePerTreatment, $this>
+     */
+    public function percentagePerTreatment(): HasMany
+    {
+        return $this->hasMany(StaffPercentagePerTreatment::class, 'staff_id');
     }
 
     public function getAuthPassword(): ?string

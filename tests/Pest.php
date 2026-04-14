@@ -33,6 +33,12 @@ pest()->extend(TenancyFeatureTestCase::class)->in(
     'Feature/Treatments/TreatmentRecordTest.php',
     'Feature/Billing/PatientPaymentRecordTest.php',
     'Feature/Billing/InvoiceTest.php',
+    'Feature/Settings/ClinicSettingsTest.php',
+    'Feature/Settings/ClinicScheduleTest.php',
+    'Feature/Staff/StaffCrudTest.php',
+    'Feature/Staff/StaffDocumentTest.php',
+    'Feature/Staff/LeaveRequestTest.php',
+    'Feature/Preferences/WidgetPreferenceTest.php',
 );
 
 /*
