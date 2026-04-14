@@ -38,6 +38,15 @@ final class DataScopeService
         return $query;
     }
 
+    public function scopeLeaveRequests(Builder $query, StaffMember $staff): Builder
+    {
+        if ($staff->clinic_access_level === 'staff') {
+            $query->where('staff_id', $staff->id);
+        }
+
+        return $query;
+    }
+
     public function canAccessPatient(StaffMember $staff, Patient $patient): bool
     {
         if (in_array($staff->clinic_access_level, ['super_admin', 'admin'], true)) {
