@@ -45,10 +45,6 @@ Route::prefix('auth')->name('api.auth.')->group(function () {
     Route::post('switch-staff', [SwitchStaffController::class, 'switchStaff'])
         ->middleware('auth:clinic_session')
         ->name('switch-staff');
-
-    Route::post('switch-staff/verify', [SwitchStaffController::class, 'verify'])
-        ->middleware('auth:clinic_session')
-        ->name('switch-staff.verify');
 });
 
 Route::middleware('auth:clinic_session')->group(function () {
