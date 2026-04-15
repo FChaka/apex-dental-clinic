@@ -4,7 +4,6 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Stancl\Tenancy\DatabaseConfig;
-use Twilio\Rest\Client as TwilioClient;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -13,12 +12,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->singleton(TwilioClient::class, function (): TwilioClient {
-            return new TwilioClient(
-                (string) config('services.twilio.sid'),
-                (string) config('services.twilio.token')
-            );
-        });
+        //
     }
 
     /**
