@@ -30,7 +30,6 @@ class PatientFactory extends Factory
             'blood_type' => null,
             'avatar_path' => null,
             'general_notes' => null,
-            'assigned_dentist_id' => null,
             'last_visit' => null,
             'status' => 'Active',
             'medical_alert' => null,

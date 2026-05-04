@@ -13,7 +13,7 @@ beforeEach(function () {
 
     $this->admin = StaffMember::factory()->create(['clinic_access_level' => 'admin']);
     $this->staffMember = StaffMember::factory()->create(['clinic_access_level' => 'staff']);
-    $this->patient = Patient::factory()->create(['assigned_dentist_id' => $this->admin->id]);
+    $this->patient = Patient::factory()->create();
 });
 
 afterEach(function () {
@@ -46,11 +46,12 @@ it('updates anamnesis', function () {
         ->assertJsonPath('data.dental_history', 'Braces as teen');
 });
 
-it('returns 403 for staff on another patients anamnesis', function () {
+it('allows staff to update patient anamnesis', function () {
     $this->actingAs($this->staffMember, 'clinic_session')
         ->withHeaders(clinicStatefulHeaders($this->clinic))
         ->putJson(clinicApiUrl($this->clinic, "api/patients/{$this->patient->id}/anamnesis"), [
             'other' => 'x',
         ])
-        ->assertForbidden();
+        ->assertOk()
+        ->assertJsonPath('data.other', 'x');
 });

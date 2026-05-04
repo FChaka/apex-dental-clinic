@@ -8,7 +8,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Tenant\Appointment;
 use App\Models\Tenant\StaffMember;
 use App\Models\Tenant\StaffWorkingSchedule;
+use App\Services\Auth\ClinicAuthService;
 use App\Support\JsonApiResponse;
+use App\Support\StaffAvatarUrl;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -20,6 +22,11 @@ use Symfony\Component\HttpFoundation\Response;
 
 final class StaffController extends Controller
 {
+
+    public function __construct(
+        private readonly ClinicAuthService $clinicAuth,
+    ) {}
+
     public function index(Request $request): JsonResponse
     {
         $auth = $this->clinicStaff();
@@ -109,6 +116,37 @@ final class StaffController extends Controller
         return JsonApiResponse::success($this->serializeStaffDetail($staff), 'OK', 201);
     }
 
+    public function avatar(StaffMember $staff): Response|JsonResponse
+    {
+        $auth = $this->clinicStaff();
+        if ($auth instanceof JsonResponse) {
+            return $auth;
+        }
+
+        $path = $staff->avatar_path;
+        if (! is_string($path) || $path === '') {
+            return response()->json(['message' => 'Avatar not found.'], 404);
+        }
+
+        $defaultDisk = (string) config('filesystems.default');
+        $disk = 'public';
+        if (! Storage::disk($disk)->exists($path)) {
+            $disk = $defaultDisk;
+        }
+
+        if ($disk === '' || ! Storage::disk($disk)->exists($path)) {
+            return response()->json(['message' => 'Avatar not found.'], 404);
+        }
+
+        $mime = Storage::disk($disk)->mimeType($path) ?: 'application/octet-stream';
+
+        return Storage::disk($disk)->response($path, null, [
+            'Content-Type' => $mime,
+            'Content-Disposition' => 'inline',
+            'Cache-Control' => 'private, max-age=3600',
+        ]);
+    }
+
     public function show(StaffMember $staff): JsonResponse
     {
         $auth = $this->clinicStaff();
@@ -156,16 +194,49 @@ final class StaffController extends Controller
             'color' => ['sometimes', 'nullable', 'string', 'max:7'],
             'paid_by_percentage' => ['sometimes', 'boolean'],
             'avatar' => ['sometimes', 'file', 'max:10240'],
+            'working_schedule' => ['sometimes', 'array', 'min:1', 'max:7'],
+            'working_schedule.*.day_of_week' => ['required', 'integer', 'between:0,6'],
+            'working_schedule.*.is_open' => ['required', 'boolean'],
+            'working_schedule.*.start_hour' => ['required', 'integer', 'between:0,23'],
+            'working_schedule.*.end_hour' => ['required', 'integer', 'between:0,23'],
+            'current_secret' => ['nullable', 'string'],
         ]);
 
+        $touchesSensitive = $this->updateTouchesSignInSensitiveFields($validated, $staff);
+
+        $rawSecret = $request->input('current_secret');
+        $currentSecret = is_string($rawSecret)
+            ? $rawSecret
+            : (is_int($rawSecret) || is_float($rawSecret) ? (string) $rawSecret : '');
+
+        if ($touchesSensitive) {
+            if ($currentSecret === '') {
+                return response()->json(['message' => 'Current credentials are required to change sign-in settings!'], 422);
+            }
+
+            $pinArg = $staff->sign_in_method === 'pin' ? $currentSecret : null;
+            $passwordArg = $staff->sign_in_method === 'password' ? $currentSecret : null;
+
+            if (! $this->clinicAuth->verifyCredentials($staff, $pinArg, $passwordArg)) {
+                return response()->json(['message' => 'Current credentials are required to change sign-in settings!'], 422);
+            }
+        }
+
+        unset($validated['current_secret']);
+
         if (! $canAdminUpdate) {
-            $validated = array_intersect_key($validated, array_flip([
-                'name',
-                'email',
-                'phone',
-                'specialty',
-                'experience',
-            ]));
+            $allowed = ['name', 'email', 'phone', 'specialty', 'experience'];
+            if ($touchesSensitive) {
+                $allowed = array_merge($allowed, [
+                    'username',
+                    'sign_in_method',
+                    'pin_length',
+                    'login_pin',
+                    'login_password',
+                ]);
+            }
+
+            $validated = array_intersect_key($validated, array_flip($allowed));
         }
 
         if ($canAdminUpdate && $auth->clinic_access_level !== 'super_admin') {
@@ -180,22 +251,28 @@ final class StaffController extends Controller
             $validated['login_password'] = Hash::make($validated['login_password']);
         }
 
+        $scheduleInput = $validated['working_schedule'] ?? null;
+        unset($validated['working_schedule']);
+
         /** @var UploadedFile|null $avatar */
         $avatar = $validated['avatar'] ?? null;
         unset($validated['avatar']);
 
         if ($avatar instanceof UploadedFile) {
-            $disk = config('filesystems.default');
             $oldPath = $staff->avatar_path;
             if (is_string($oldPath) && $oldPath !== '') {
-                Storage::disk($disk)->delete($oldPath);
+                foreach (['public', (string) config('filesystems.default')] as $diskName) {
+                    if (Storage::disk($diskName)->exists($oldPath)) {
+                        Storage::disk($diskName)->delete($oldPath);
+                    }
+                }
             }
 
             $tenantSlug = (string) tenancy()->tenant->slug;
             $ext = $avatar->getClientOriginalExtension() ?: 'bin';
             $path = "tenants/{$tenantSlug}/staff/{$staff->id}/avatar.{$ext}";
 
-            Storage::disk($disk)->putFileAs(
+            Storage::disk('public')->putFileAs(
                 "tenants/{$tenantSlug}/staff/{$staff->id}",
                 $avatar,
                 "avatar.{$ext}"
@@ -206,6 +283,19 @@ final class StaffController extends Controller
 
         $staff->fill($validated);
         $staff->save();
+
+        if (is_array($scheduleInput)) {
+            foreach ($scheduleInput as $day) {
+                StaffWorkingSchedule::query()->updateOrCreate(
+                    ['staff_id' => $staff->id, 'day_of_week' => $day['day_of_week']],
+                    [
+                        'is_open' => $day['is_open'],
+                        'start_hour' => $day['start_hour'],
+                        'end_hour' => $day['end_hour'],
+                    ],
+                );
+            }
+        }
 
         $staff->load([
             'workingSchedules' => fn ($q) => $q->orderBy('day_of_week'),
@@ -248,6 +338,34 @@ final class StaffController extends Controller
         return response()->noContent();
     }
 
+    /**
+     * @param array<string, mixed> $validated
+     */
+    private function updateTouchesSignInSensitiveFields(array $validated, StaffMember $staff): bool
+    {
+        if (array_key_exists('username', $validated) && (string) $validated['username'] !== (string) $staff->username) {
+            return true;
+        }
+
+        if (array_key_exists('sign_in_method', $validated) && (string) $validated['sign_in_method'] !== (string) $staff->sign_in_method) {
+            return true;
+        }
+
+        if (array_key_exists('pin_length', $validated) && (int) $validated['pin_length'] !== (int) $staff->pin_length) {
+            return true;
+        }
+
+        if (array_key_exists('login_pin', $validated) && is_string($validated['login_pin']) && $validated['login_pin'] !== '') {
+            return true;
+        }
+
+        if (array_key_exists('login_password', $validated) && is_string($validated['login_password']) && $validated['login_password'] !== '') {
+            return true;
+        }
+
+        return false;
+    }
+
     private function clinicStaff(): StaffMember|JsonResponse
     {
         $staff = auth('clinic_session')->user();
@@ -274,6 +392,7 @@ final class StaffController extends Controller
             'email' => $s->email,
             'phone' => $s->phone,
             'avatar_path' => $s->avatar_path,
+            'avatar_url' => StaffAvatarUrl::forStaffMember($s),
             'role' => $s->role,
             'clinic_access_level' => $s->clinic_access_level,
             'specialty' => $s->specialty,

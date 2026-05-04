@@ -18,9 +18,7 @@ beforeEach(function () {
     $this->staff = StaffMember::factory()->create([
         'clinic_access_level' => 'staff',
     ]);
-    $this->patient = Patient::factory()->create([
-        'assigned_dentist_id' => $this->admin->id,
-    ]);
+    $this->patient = Patient::factory()->create();
     $this->treatmentType = TreatmentType::factory()->create();
 });
 

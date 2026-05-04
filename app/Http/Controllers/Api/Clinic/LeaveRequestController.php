@@ -58,14 +58,24 @@ final class LeaveRequestController extends Controller
             return $auth;
         }
 
-        $validated = $request->validate([
+        $rules = [
             'start_date' => ['required', 'date'],
             'end_date' => ['required', 'date', 'after_or_equal:start_date'],
             'note' => ['nullable', 'string'],
-        ]);
+        ];
+        if ($this->canManageOtherLeave($auth)) {
+            $rules['staff_id'] = ['sometimes', 'integer', 'exists:staff_members,id'];
+        }
+
+        $validated = $request->validate($rules);
+
+        $staffId = $auth->id;
+        if ($this->canManageOtherLeave($auth) && ! empty($validated['staff_id'])) {
+            $staffId = (int) $validated['staff_id'];
+        }
 
         $lr = LeaveRequest::query()->create([
-            'staff_id' => $auth->id,
+            'staff_id' => $staffId,
             'start_date' => $validated['start_date'],
             'end_date' => $validated['end_date'],
             'note' => $validated['note'] ?? null,
@@ -89,14 +99,21 @@ final class LeaveRequestController extends Controller
         $isAdmin = $this->isClinicAdmin($auth);
         $isOwner = (int) $leaveRequest->staff_id === (int) $auth->id;
 
-        $validated = $request->validate([
+        $canManage = $this->canManageOtherLeave($auth);
+
+        $rules = [
             'status' => ['sometimes', Rule::in(['Approved', 'Rejected', 'Removed'])],
             'start_date' => ['sometimes', 'date'],
             'end_date' => ['sometimes', 'date', 'after_or_equal:start_date'],
             'note' => ['nullable', 'string'],
-        ]);
+        ];
+        if ($canManage) {
+            $rules['staff_id'] = ['sometimes', 'integer', 'exists:staff_members,id'];
+        }
 
-        if (! $isAdmin) {
+        $validated = $request->validate($rules);
+
+        if (! $isAdmin && ! $canManage) {
             if (! $isOwner) {
                 return response()->json(['message' => 'Forbidden.'], 403);
             }
@@ -116,6 +133,11 @@ final class LeaveRequestController extends Controller
                 $validated['responded_at'] = now();
             }
         }
+
+        if (array_key_exists('staff_id', $validated) && $canManage) {
+            $leaveRequest->staff_id = $validated['staff_id'];
+        }
+        unset($validated['staff_id']);
 
         $leaveRequest->fill($validated);
         $leaveRequest->save();
@@ -156,6 +178,11 @@ final class LeaveRequestController extends Controller
     private function isClinicAdmin(StaffMember $staff): bool
     {
         return in_array($staff->clinic_access_level, ['super_admin', 'admin'], true);
+    }
+
+    private function canManageOtherLeave(StaffMember $staff): bool
+    {
+        return $this->isClinicAdmin($staff) || $staff->role === 'Receptionist';
     }
 
     /**

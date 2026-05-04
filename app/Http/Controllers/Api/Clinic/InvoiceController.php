@@ -140,10 +140,12 @@ final class InvoiceController extends Controller
         });
 
         $invoice->load([
-            'patient' => fn ($q) => $q->select('id', 'name', 'surname'),
+            'patient',
             'treatmentEntries.treatmentType' => fn ($q) => $q->select('id', 'name'),
             'treatmentEntries.dentist' => fn ($q) => $q->select('id', 'name'),
         ]);
+
+        $this->generateAndStoreInvoicePdf($invoice);
 
         return JsonApiResponse::success($this->serializeInvoiceDetail($invoice), 'Invoice created successfully.', Response::HTTP_CREATED);
     }
@@ -187,6 +189,13 @@ final class InvoiceController extends Controller
 
         if ($invoice->wasChanged(['amount', 'vat_rate', 'status', 'due_date'])) {
             $this->invalidateStoredInvoicePdf($invoice);
+
+            $invoice->load([
+                'patient',
+                'treatmentEntries.treatmentType' => fn ($q) => $q->select('id', 'name'),
+                'treatmentEntries.dentist' => fn ($q) => $q->select('id', 'name'),
+            ]);
+            $this->generateAndStoreInvoicePdf($invoice);
         }
 
         return JsonApiResponse::success($this->serializeInvoiceList($invoice->fresh()->load([
@@ -216,6 +225,15 @@ final class InvoiceController extends Controller
             ]);
         }
 
+        $storedPath = $this->generateAndStoreInvoicePdf($invoice);
+
+        return Storage::disk($disk)->download($storedPath, $invoice->invoice_number.'.pdf', [
+            'Content-Type' => 'application/pdf',
+        ]);
+    }
+
+    private function generateAndStoreInvoicePdf(Invoice $invoice): string
+    {
         $clinicSetting = ClinicSetting::query()->first();
         $invoiceSetting = InvoiceSetting::query()->first();
 
@@ -226,20 +244,11 @@ final class InvoiceController extends Controller
             'invoiceSetting' => $invoiceSetting,
         ])->setPaper('a4');
 
-        $binary = $pdf->output();
         $relativePath = TenantPatientStoragePaths::invoicePdfRelativePath($invoice);
-        Storage::disk($disk)->put($relativePath, $binary);
+        Storage::disk(config('filesystems.default'))->put($relativePath, $pdf->output());
         $invoice->update(['pdf_path' => $relativePath]);
 
-        return response()->streamDownload(
-            static function () use ($binary): void {
-                echo $binary;
-            },
-            $invoice->invoice_number.'.pdf',
-            [
-                'Content-Type' => 'application/pdf',
-            ]
-        );
+        return $relativePath;
     }
 
     private function invalidateStoredInvoicePdf(Invoice $invoice): void

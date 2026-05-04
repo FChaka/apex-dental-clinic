@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\Clinic\PatientMonthlyPlanController;
 use App\Http\Controllers\Api\Clinic\PatientPaymentRecordController;
 use App\Http\Controllers\Api\Clinic\PatientTeethChartController;
 use App\Http\Controllers\Api\Clinic\PatientTreatmentEntryController;
+use App\Http\Controllers\Api\Clinic\PatientXrayController;
 use App\Http\Controllers\Api\Clinic\StaffController;
 use App\Http\Controllers\Api\Clinic\StaffDocumentController;
 use App\Http\Controllers\Api\Clinic\SwitchStaffController;
@@ -63,6 +64,7 @@ Route::middleware('auth:clinic_session')->group(function () {
     // Staff
     Route::get('/staff', [StaffController::class, 'index'])->name('api.staff.index');
     Route::post('/staff', [StaffController::class, 'store'])->name('api.staff.store');
+    Route::get('/staff/{staff}/avatar', [StaffController::class, 'avatar'])->name('api.staff.avatar');
     Route::get('/staff/{staff}', [StaffController::class, 'show'])->name('api.staff.show');
     Route::put('/staff/{staff}', [StaffController::class, 'update'])->name('api.staff.update');
     Route::delete('/staff/{staff}', [StaffController::class, 'destroy'])->name('api.staff.destroy');
@@ -70,7 +72,9 @@ Route::middleware('auth:clinic_session')->group(function () {
     // Staff documents
     Route::get('/staff/{staff}/documents', [StaffDocumentController::class, 'index'])->name('api.staff.documents.index');
     Route::post('/staff/{staff}/documents', [StaffDocumentController::class, 'store'])->name('api.staff.documents.store');
-    Route::delete('/staff/{staff}/documents/{document}', [StaffDocumentController::class, 'destroy'])->name('api.staff.documents.destroy');
+    Route::delete('/staff/{staff}/documents/{document}', [StaffDocumentController::class, 'destroy'])
+        ->name('api.staff.documents.destroy')
+        ->scopeBindings();
 
     // Leave requests
     Route::get('/leave-requests', [LeaveRequestController::class, 'index'])->name('api.leave-requests.index');
@@ -112,6 +116,7 @@ Route::middleware('auth:clinic_session')->group(function () {
     Route::post('/patients', [PatientController::class, 'store'])->name('api.patients.store');
     Route::get('/patients/{patient}', [PatientController::class, 'show'])->name('api.patients.show');
     Route::put('/patients/{patient}', [PatientController::class, 'update'])->name('api.patients.update');
+    Route::delete('/patients/{patient}', [PatientController::class, 'destroy'])->name('api.patients.destroy');
 
     // Patient Medical History Routes
     Route::get('/patients/{patient}/medical-history', [PatientMedicalHistoryController::class, 'show'])
@@ -136,8 +141,33 @@ Route::middleware('auth:clinic_session')->group(function () {
         ->name('api.patients.documents.index');
     Route::post('/patients/{patient}/documents', [PatientDocumentController::class, 'store'])
         ->name('api.patients.documents.store');
+    Route::get('/patients/{patient}/documents/{document}/download', [PatientDocumentController::class, 'download'])
+        ->name('api.patients.documents.download')
+        ->scopeBindings();
     Route::delete('/patients/{patient}/documents/{document}', [PatientDocumentController::class, 'destroy'])
-        ->name('api.patients.documents.destroy');
+        ->name('api.patients.documents.destroy')
+        ->scopeBindings();
+
+    // Patient X-rays
+    Route::get('/patients/{patient}/xrays/{xray}/image', [PatientXrayController::class, 'image'])
+        ->name('api.patients.xrays.image')
+        ->scopeBindings();
+    Route::get('/patients/{patient}/xrays/{xray}/thumbnail', [PatientXrayController::class, 'thumbnail'])
+        ->name('api.patients.xrays.thumbnail')
+        ->scopeBindings();
+    Route::get('/patients/{patient}/xrays', [PatientXrayController::class, 'index'])
+        ->name('api.patients.xrays.index');
+    Route::post('/patients/{patient}/xrays', [PatientXrayController::class, 'store'])
+        ->name('api.patients.xrays.store');
+    Route::get('/patients/{patient}/xrays/{xray}', [PatientXrayController::class, 'show'])
+        ->name('api.patients.xrays.show')
+        ->scopeBindings();
+    Route::match(['put', 'patch'], '/patients/{patient}/xrays/{xray}', [PatientXrayController::class, 'update'])
+        ->name('api.patients.xrays.update')
+        ->scopeBindings();
+    Route::delete('/patients/{patient}/xrays/{xray}', [PatientXrayController::class, 'destroy'])
+        ->name('api.patients.xrays.destroy')
+        ->scopeBindings();
 
     // Patient Monthly Plans Routes
     Route::get('/patients/{patient}/monthly-plans', [PatientMonthlyPlanController::class, 'index'])
@@ -145,9 +175,11 @@ Route::middleware('auth:clinic_session')->group(function () {
     Route::post('/patients/{patient}/monthly-plans', [PatientMonthlyPlanController::class, 'store'])
         ->name('api.patients.monthly-plans.store');
     Route::put('/patients/{patient}/monthly-plans/{plan}', [PatientMonthlyPlanController::class, 'update'])
-        ->name('api.patients.monthly-plans.update');
+        ->name('api.patients.monthly-plans.update')
+        ->scopeBindings();
     Route::delete('/patients/{patient}/monthly-plans/{plan}', [PatientMonthlyPlanController::class, 'destroy'])
-        ->name('api.patients.monthly-plans.destroy');
+        ->name('api.patients.monthly-plans.destroy')
+        ->scopeBindings();
 
     // Patient Insights Routes
     Route::get('/patients/{patient}/insights', [PatientInsightsController::class, 'show'])
@@ -159,9 +191,11 @@ Route::middleware('auth:clinic_session')->group(function () {
     Route::post('/patients/{patient}/treatments', [PatientTreatmentEntryController::class, 'store'])
         ->name('api.patients.treatments.store');
     Route::put('/patients/{patient}/treatments/{entry}', [PatientTreatmentEntryController::class, 'update'])
-        ->name('api.patients.treatments.update');
+        ->name('api.patients.treatments.update')
+        ->scopeBindings();
     Route::delete('/patients/{patient}/treatments/{entry}', [PatientTreatmentEntryController::class, 'destroy'])
-        ->name('api.patients.treatments.destroy');
+        ->name('api.patients.treatments.destroy')
+        ->scopeBindings();
 
     // Patient Payments Routes
     Route::get('/patients/{patient}/payments', [PatientPaymentRecordController::class, 'index'])
@@ -169,7 +203,8 @@ Route::middleware('auth:clinic_session')->group(function () {
     Route::post('/patients/{patient}/payments', [PatientPaymentRecordController::class, 'store'])
         ->name('api.patients.payments.store');
     Route::delete('/patients/{patient}/payments/{payment}', [PatientPaymentRecordController::class, 'destroy'])
-        ->name('api.patients.payments.destroy');
+        ->name('api.patients.payments.destroy')
+        ->scopeBindings();
 });
 
 Route::prefix('platform/auth')->name('api.platform.auth.')->group(function () {

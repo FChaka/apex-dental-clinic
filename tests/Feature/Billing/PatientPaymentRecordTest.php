@@ -19,9 +19,7 @@ beforeEach(function () {
     $this->staff = StaffMember::factory()->create([
         'clinic_access_level' => 'staff',
     ]);
-    $this->patient = Patient::factory()->create([
-        'assigned_dentist_id' => $this->admin->id,
-    ]);
+    $this->patient = Patient::factory()->create();
     $this->treatmentType = TreatmentType::factory()->create();
 });
 
@@ -114,7 +112,7 @@ it('reverses amount_paid when payment linked to treatment is deleted', function 
 });
 
 it('rejects treatment_id that belongs to another patient', function () {
-    $otherPatient = Patient::factory()->create(['assigned_dentist_id' => $this->admin->id]);
+    $otherPatient = Patient::factory()->create();
     $entry = PatientTreatmentEntry::factory()->create([
         'patient_id' => $otherPatient->id,
         'dentist_id' => $this->admin->id,
@@ -131,11 +129,18 @@ it('rejects treatment_id that belongs to another patient', function () {
         ->assertUnprocessable();
 });
 
-it('forbids staff without patient access', function () {
+it('allows staff to list payments for any patient', function () {
+    PatientPaymentRecord::factory()->create([
+        'patient_id' => $this->patient->id,
+        'date' => '2026-05-01',
+        'amount' => 5.00,
+    ]);
+
     $this->actingAs($this->staff, 'clinic_session')
         ->withHeaders(clinicStatefulHeaders($this->clinic))
         ->getJson(clinicApiUrl($this->clinic, "api/patients/{$this->patient->id}/payments"))
-        ->assertForbidden();
+        ->assertOk()
+        ->assertJsonCount(1, 'data');
 });
 
 it('returns 401 when unauthenticated', function () {
@@ -145,7 +150,7 @@ it('returns 401 when unauthenticated', function () {
 });
 
 it('returns 404 when deleting payment for wrong patient', function () {
-    $other = Patient::factory()->create(['assigned_dentist_id' => $this->admin->id]);
+    $other = Patient::factory()->create();
     $payment = PatientPaymentRecord::factory()->create(['patient_id' => $other->id]);
 
     $this->actingAs($this->admin, 'clinic_session')

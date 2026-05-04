@@ -18,9 +18,7 @@ beforeEach(function () {
     $this->staffMember = StaffMember::factory()->create([
         'clinic_access_level' => 'staff',
     ]);
-    $this->patient = Patient::factory()->create([
-        'assigned_dentist_id' => $this->admin->id,
-    ]);
+    $this->patient = Patient::factory()->create();
 });
 
 afterEach(function () {
@@ -39,9 +37,9 @@ it('lists patients for admin', function () {
         ->assertJsonPath('meta.per_page', 20);
 });
 
-it('scopes the patient index to assigned patients for staff', function () {
-    $mine = Patient::factory()->create(['assigned_dentist_id' => $this->staffMember->id]);
-    Patient::factory()->create(['assigned_dentist_id' => $this->admin->id]);
+it('allows staff to list patients', function () {
+    $mine = Patient::factory()->create();
+    $other = Patient::factory()->create();
 
     $response = $this->actingAs($this->staffMember, 'clinic_session')
         ->withHeaders(clinicStatefulHeaders($this->clinic))
@@ -49,12 +47,11 @@ it('scopes the patient index to assigned patients for staff', function () {
 
     $response->assertOk();
     $ids = collect($response->json('data'))->pluck('id')->all();
-    expect($ids)->toContain($mine->id)->not->toContain($this->patient->id);
+    expect($ids)->toContain($mine->id)->toContain($other->id)->toContain($this->patient->id);
 });
 
-it('allows staff to view their assigned patient', function () {
-    $p = Patient::factory()->create(['assigned_dentist_id' => $this->staffMember->id]);
-
+it('allows staff to view a patient', function () {
+    $p = Patient::factory()->create();
     $this->actingAs($this->staffMember, 'clinic_session')
         ->withHeaders(clinicStatefulHeaders($this->clinic))
         ->getJson(clinicApiUrl($this->clinic, "api/patients/{$p->id}"))
@@ -62,11 +59,11 @@ it('allows staff to view their assigned patient', function () {
         ->assertJsonPath('data.id', $p->id);
 });
 
-it('returns 403 when staff views another dentists patient', function () {
+it('allows staff to view any patient', function () {
     $this->actingAs($this->staffMember, 'clinic_session')
         ->withHeaders(clinicStatefulHeaders($this->clinic))
         ->getJson(clinicApiUrl($this->clinic, "api/patients/{$this->patient->id}"))
-        ->assertForbidden();
+        ->assertOk();
 });
 
 it('returns patient detail for admin', function () {
@@ -79,7 +76,6 @@ it('returns patient detail for admin', function () {
             'data' => [
                 'medical_history',
                 'anamnesis',
-                'assigned_dentist',
             ],
         ]);
 });
@@ -97,6 +93,57 @@ it('returns 401 when unauthenticated', function () {
     $this->withHeaders(clinicStatefulHeaders($this->clinic))
         ->getJson(clinicApiUrl($this->clinic, 'api/patients'))
         ->assertUnauthorized();
+});
+
+it('soft deletes a patient as admin', function () {
+    $toDelete = Patient::factory()->create();
+
+    $this->actingAs($this->admin, 'clinic_session')
+        ->withHeaders(clinicStatefulHeaders($this->clinic))
+        ->deleteJson(clinicApiUrl($this->clinic, "api/patients/{$toDelete->id}"))
+        ->assertNoContent();
+
+    $this->assertSoftDeleted($toDelete);
+});
+
+it('soft deletes a patient as staff', function () {
+    $p = Patient::factory()->create();
+
+    $this->actingAs($this->staffMember, 'clinic_session')
+        ->withHeaders(clinicStatefulHeaders($this->clinic))
+        ->deleteJson(clinicApiUrl($this->clinic, "api/patients/{$p->id}"))
+        ->assertNoContent();
+
+    $this->assertSoftDeleted($p);
+});
+
+it('allows staff to delete any patient', function () {
+    $this->actingAs($this->staffMember, 'clinic_session')
+        ->withHeaders(clinicStatefulHeaders($this->clinic))
+        ->deleteJson(clinicApiUrl($this->clinic, "api/patients/{$this->patient->id}"))
+        ->assertNoContent();
+
+    $this->assertSoftDeleted($this->patient);
+});
+
+it('returns 401 when unauthenticated delete', function () {
+    $this->withHeaders(clinicStatefulHeaders($this->clinic))
+        ->deleteJson(clinicApiUrl($this->clinic, "api/patients/{$this->patient->id}"))
+        ->assertUnauthorized();
+});
+
+it('returns 404 when fetching a soft deleted patient', function () {
+    $p = Patient::factory()->create();
+
+    $this->actingAs($this->admin, 'clinic_session')
+        ->withHeaders(clinicStatefulHeaders($this->clinic))
+        ->deleteJson(clinicApiUrl($this->clinic, "api/patients/{$p->id}"))
+        ->assertNoContent();
+
+    $this->actingAs($this->admin, 'clinic_session')
+        ->withHeaders(clinicStatefulHeaders($this->clinic))
+        ->getJson(clinicApiUrl($this->clinic, "api/patients/{$p->id}"))
+        ->assertNotFound();
 });
 
 it('creates a patient with medical history and anamnesis', function () {
@@ -152,7 +199,7 @@ it('updates patient with nested medical history and anamnesis', function () {
 
 it('filters patients by has_pending_payments', function () {
     $type = TreatmentType::factory()->create();
-    $withPending = Patient::factory()->create(['assigned_dentist_id' => $this->admin->id]);
+    $withPending = Patient::factory()->create();
     PatientTreatmentEntry::query()->create([
         'patient_id' => $withPending->id,
         'treatment_type_id' => $type->id,

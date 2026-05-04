@@ -91,6 +91,38 @@ final class PatientDocumentController extends Controller
         );
     }
 
+    public function download(Patient $patient, PatientDocument $document): Response
+    {
+        $staff = $this->clinicStaff();
+        if ($staff instanceof JsonResponse) {
+            return $staff;
+        }
+
+        if ($response = $this->guardPatientAccess($this->dataScope, $staff, $patient)) {
+            return $response;
+        }
+
+        if ((int) $document->patient_id !== (int) $patient->id) {
+            return response()->json(['message' => 'Document not found.'], 404);
+        }
+
+        $disk = config('filesystems.default');
+        $path = (string) $document->file_path;
+
+        if ($path === '' || ! Storage::disk($disk)->exists($path)) {
+            return response()->json(['message' => 'Document not found.'], 404);
+        }
+
+        $mime = (string) $document->type;
+        if ($mime === '') {
+            $mime = 'application/octet-stream';
+        }
+
+        return Storage::disk($disk)->download($path, $document->file_name, [
+            'Content-Type' => $mime,
+        ]);
+    }
+
     public function destroy(Patient $patient, PatientDocument $document): Response
     {
         $staff = $this->clinicStaff();

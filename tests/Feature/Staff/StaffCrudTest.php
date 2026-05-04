@@ -7,6 +7,7 @@ use App\Models\Tenant\Appointment;
 use App\Models\Tenant\StaffMember;
 use App\Models\Tenant\StaffWorkingSchedule;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
@@ -138,16 +139,52 @@ it('staff can update own limited profile fields only', function () {
     expect($target->clinic_access_level)->toBe('staff');
 });
 
+it('rejects self sign-in sensitive update without current_secret', function () {
+    $target = StaffMember::factory()->create([
+        'clinic_access_level' => 'staff',
+        'role' => 'Dentist',
+    ]);
+
+    $this->actingAs($target, 'clinic_session')
+        ->withHeaders(clinicStatefulHeaders($this->clinic))
+        ->putJson(clinicApiUrl($this->clinic, "api/staff/{$target->id}"), [
+            'login_pin' => '0000',
+            'current_secret' => '',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonPath('message', 'Current credentials are required to change sign-in settings!');
+});
+
+it('staff can update own pin when current_secret is valid', function () {
+    $target = StaffMember::factory()->create([
+        'clinic_access_level' => 'staff',
+        'role' => 'Dentist',
+    ]);
+
+    $this->actingAs($target, 'clinic_session')
+        ->withHeaders(clinicStatefulHeaders($this->clinic))
+        ->putJson(clinicApiUrl($this->clinic, "api/staff/{$target->id}"), [
+            'login_pin' => '0000',
+            'current_secret' => '1234',
+        ])
+        ->assertOk()
+        ->assertJsonMissingPath('data.login_pin');
+
+    $target->refresh();
+    expect(Hash::check('0000', (string) $target->getRawOriginal('login_pin')))->toBeTrue();
+});
+
 it('admin can update avatar and credentials are never returned', function () {
-    Storage::fake(config('filesystems.default'));
-    $disk = config('filesystems.default');
+    $oldDisk = (string) config('filesystems.default');
+    Storage::fake($oldDisk);
+    Storage::fake('public');
 
     $target = StaffMember::factory()->create([
         'clinic_access_level' => 'staff',
         'role' => 'Dentist',
         'avatar_path' => 'tenants/test-clinic/staff/99/avatar.png',
     ]);
-    Storage::disk($disk)->put($target->avatar_path, 'old');
+    Storage::disk($oldDisk)->put($target->avatar_path, 'old');
 
     $file = UploadedFile::fake()->image('avatar.png', 120, 120);
 
@@ -159,15 +196,65 @@ it('admin can update avatar and credentials are never returned', function () {
         ->put(clinicApiUrl($this->clinic, "api/staff/{$target->id}"), [
             'avatar' => $file,
             'login_pin' => '9999',
+            'current_secret' => '1234',
         ]);
 
     $response->assertOk()
         ->assertJsonMissingPath('data.login_pin')
         ->assertJsonMissingPath('data.login_password')
-        ->assertJsonStructure(['data' => ['avatar_path']]);
+        ->assertJsonStructure(['data' => ['avatar_path', 'avatar_url']]);
 
-    Storage::disk($disk)->assertMissing('tenants/test-clinic/staff/99/avatar.png');
-    Storage::disk($disk)->assertExists($response->json('data.avatar_path'));
+    Storage::disk($oldDisk)->assertMissing('tenants/test-clinic/staff/99/avatar.png');
+    Storage::disk('public')->assertExists($response->json('data.avatar_path'));
+    expect($response->json('data.avatar_url'))->toBeString();
+    expect((string) $response->json('data.avatar_url'))->toContain('/storage/');
+});
+
+it('rejects sign-in sensitive staff update without current_secret', function () {
+    $target = StaffMember::factory()->create([
+        'clinic_access_level' => 'staff',
+        'role' => 'Dentist',
+    ]);
+
+    $this->actingAs($this->admin, 'clinic_session')
+        ->withHeaders(clinicStatefulHeaders($this->clinic))
+        ->putJson(clinicApiUrl($this->clinic, "api/staff/{$target->id}"), [
+            'login_pin' => '9999',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonPath('message', 'Current credentials are required to change sign-in settings!');
+});
+
+it('rejects sign-in sensitive staff update when current_secret is wrong', function () {
+    $target = StaffMember::factory()->create([
+        'clinic_access_level' => 'staff',
+        'role' => 'Dentist',
+    ]);
+
+    $this->actingAs($this->admin, 'clinic_session')
+        ->withHeaders(clinicStatefulHeaders($this->clinic))
+        ->putJson(clinicApiUrl($this->clinic, "api/staff/{$target->id}"), [
+            'login_pin' => '9999',
+            'current_secret' => 'wrong-pin',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonPath('message', 'Current credentials are required to change sign-in settings!');
+});
+
+it('rejects username change without current_secret', function () {
+    $target = StaffMember::factory()->create([
+        'clinic_access_level' => 'staff',
+        'role' => 'Dentist',
+        'username' => 'originaluser',
+    ]);
+
+    $this->actingAs($this->admin, 'clinic_session')
+        ->withHeaders(clinicStatefulHeaders($this->clinic))
+        ->putJson(clinicApiUrl($this->clinic, "api/staff/{$target->id}"), [
+            'username' => 'newusername',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonPath('message', 'Current credentials are required to change sign-in settings!');
 });
 
 it('receptionist cannot delete staff even with admin access', function () {
@@ -209,4 +296,47 @@ it('soft deletes staff when allowed', function () {
         ->assertNoContent();
 
     expect(StaffMember::withTrashed()->find($target->id)?->deleted_at)->not->toBeNull();
+});
+
+it('returns avatar_url as /api stream URL when avatar exists only on local disk', function () {
+    $defaultDisk = (string) config('filesystems.default');
+    Storage::fake($defaultDisk);
+
+    $target = StaffMember::factory()->create();
+    $path = "tenants/test-clinic/staff/{$target->id}/avatar.jpg";
+    Storage::disk($defaultDisk)->put($path, 'binary-pretend');
+    $target->update(['avatar_path' => $path]);
+
+    $response = $this->actingAs($this->admin, 'clinic_session')
+        ->withHeaders(clinicStatefulHeaders($this->clinic))
+        ->getJson(clinicApiUrl($this->clinic, 'api/staff'))
+        ->assertOk();
+
+    $row = collect($response->json('data'))->firstWhere('id', $target->id);
+    expect($row)->not->toBeNull()
+        ->and((string) $row['avatar_url'])->toContain("/api/staff/{$target->id}/avatar")
+        ->and((string) $row['avatar_url'])->toContain('tenant=test-clinic');
+
+    $this->actingAs($this->admin, 'clinic_session')
+        ->withHeaders(clinicStatefulHeaders($this->clinic))
+        ->get(clinicApiUrl($this->clinic, "api/staff/{$target->id}/avatar"))
+        ->assertOk();
+});
+
+it('includes avatar_url in staff list when avatar is set', function () {
+    Storage::fake('public');
+    $target = StaffMember::factory()->create(['name' => 'ZetaWithAvatar']);
+    $path = "tenants/test-clinic/staff/{$target->id}/avatar.png";
+    Storage::disk('public')->put($path, 'x');
+    $target->update(['avatar_path' => $path]);
+
+    $response = $this->actingAs($this->admin, 'clinic_session')
+        ->withHeaders(clinicStatefulHeaders($this->clinic))
+        ->getJson(clinicApiUrl($this->clinic, 'api/staff'))
+        ->assertOk();
+
+    $row = collect($response->json('data'))->firstWhere('id', $target->id);
+    expect($row)->not->toBeNull()
+        ->and($row['avatar_url'])->toContain('/storage/'.$path)
+        ->and($row['avatar_path'])->toBe($path);
 });

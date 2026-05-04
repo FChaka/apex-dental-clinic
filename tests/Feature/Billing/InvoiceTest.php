@@ -21,9 +21,7 @@ beforeEach(function () {
     $this->staff = StaffMember::factory()->create([
         'clinic_access_level' => 'staff',
     ]);
-    $this->patient = Patient::factory()->create([
-        'assigned_dentist_id' => $this->admin->id,
-    ]);
+    $this->patient = Patient::factory()->create();
     $this->treatmentType = TreatmentType::factory()->create();
 });
 
@@ -158,7 +156,7 @@ it('shows invoice with treatment entries', function () {
 });
 
 it('rejects treatment entries that belong to another patient', function () {
-    $otherPatient = Patient::factory()->create(['assigned_dentist_id' => $this->admin->id]);
+    $otherPatient = Patient::factory()->create();
     $entry = PatientTreatmentEntry::factory()->create([
         'patient_id' => $otherPatient->id,
         'dentist_id' => $this->admin->id,
@@ -206,7 +204,7 @@ it('returns 401 for pdf when unauthenticated', function () {
         ->assertUnauthorized();
 });
 
-it('stores and caches invoice pdf on disk', function () {
+it('generates pdf on disk at store time', function () {
     config(['filesystems.default' => 'local']);
     Storage::fake('local');
 
@@ -221,6 +219,11 @@ it('stores and caches invoice pdf on disk', function () {
         ->assertCreated();
 
     $invoice = Invoice::query()->firstOrFail();
+    expect($invoice->pdf_path)->not->toBeNull();
+    Storage::disk('local')->assertExists($invoice->pdf_path);
+
+    $expectedPath = TenantPatientStoragePaths::invoicePdfRelativePath($invoice->load('patient'));
+    expect($invoice->pdf_path)->toBe($expectedPath);
 
     $first = $this->actingAs($this->admin, 'clinic_session')
         ->withHeaders(clinicStatefulHeaders($this->clinic))
@@ -228,13 +231,6 @@ it('stores and caches invoice pdf on disk', function () {
 
     $first->assertOk();
     $first->assertHeader('content-type', 'application/pdf');
-
-    $invoice->refresh();
-    expect($invoice->pdf_path)->not->toBeNull();
-    Storage::disk('local')->assertExists($invoice->pdf_path);
-
-    $expectedPath = TenantPatientStoragePaths::invoicePdfRelativePath($invoice->load('patient'));
-    expect($invoice->pdf_path)->toBe($expectedPath);
 
     $second = $this->actingAs($this->admin, 'clinic_session')
         ->withHeaders(clinicStatefulHeaders($this->clinic))
@@ -245,7 +241,7 @@ it('stores and caches invoice pdf on disk', function () {
     Storage::disk('local')->assertExists($invoice->fresh()->pdf_path);
 });
 
-it('deletes cached pdf after invoice update', function () {
+it('regenerates pdf after invoice update', function () {
     config(['filesystems.default' => 'local']);
     Storage::fake('local');
 
@@ -260,16 +256,11 @@ it('deletes cached pdf after invoice update', function () {
         ->assertCreated();
 
     $invoice = Invoice::query()->firstOrFail();
+    $originalPath = $invoice->pdf_path;
+    expect($originalPath)->not->toBeNull();
+    Storage::disk('local')->assertExists($originalPath);
 
-    $this->actingAs($this->admin, 'clinic_session')
-        ->withHeaders(clinicStatefulHeaders($this->clinic))
-        ->get(clinicApiUrl($this->clinic, "api/invoices/{$invoice->id}/pdf"))
-        ->assertOk();
-
-    $invoice->refresh();
-    $path = $invoice->pdf_path;
-    expect($path)->not->toBeNull();
-    Storage::disk('local')->assertExists($path);
+    $originalContent = Storage::disk('local')->get($originalPath);
 
     $this->actingAs($this->admin, 'clinic_session')
         ->withHeaders(clinicStatefulHeaders($this->clinic))
@@ -279,8 +270,10 @@ it('deletes cached pdf after invoice update', function () {
         ->assertOk();
 
     $invoice->refresh();
-    expect($invoice->pdf_path)->toBeNull();
-    Storage::disk('local')->assertMissing($path);
+    expect($invoice->pdf_path)->not->toBeNull();
+    Storage::disk('local')->assertExists($invoice->pdf_path);
+    $newContent = Storage::disk('local')->get($invoice->pdf_path);
+    expect($newContent)->not->toBe($originalContent);
 });
 
 it('serves cached pdf after patient name change using stored pdf_path', function () {
@@ -303,14 +296,7 @@ it('serves cached pdf after patient name change using stored pdf_path', function
         ->assertCreated();
 
     $invoice = Invoice::query()->firstOrFail();
-
-    $first = $this->actingAs($this->admin, 'clinic_session')
-        ->withHeaders(clinicStatefulHeaders($this->clinic))
-        ->get(clinicApiUrl($this->clinic, "api/invoices/{$invoice->id}/pdf"));
-
-    $first->assertOk();
-
-    $storedPath = $invoice->fresh()->pdf_path;
+    $storedPath = $invoice->pdf_path;
     expect($storedPath)->not->toBeNull();
     Storage::disk('local')->assertExists($storedPath);
 
@@ -319,13 +305,12 @@ it('serves cached pdf after patient name change using stored pdf_path', function
         'surname' => 'Jones',
     ]);
 
-    $second = $this->actingAs($this->admin, 'clinic_session')
+    $response = $this->actingAs($this->admin, 'clinic_session')
         ->withHeaders(clinicStatefulHeaders($this->clinic))
         ->get(clinicApiUrl($this->clinic, "api/invoices/{$invoice->id}/pdf"));
 
-    $second->assertOk();
+    $response->assertOk();
     expect($invoice->fresh()->pdf_path)->toBe($storedPath);
-    expect($first->getContent())->toBe($second->getContent());
     Storage::disk('local')->assertExists($storedPath);
 });
 
@@ -341,7 +326,7 @@ it('does not expose other clinic invoices in the index', function () {
     $otherClinic = createTestTenant('other-inv');
     tenancy()->initialize($otherClinic);
     $adminOther = StaffMember::factory()->create(['clinic_access_level' => 'admin']);
-    $patientOther = Patient::factory()->create(['assigned_dentist_id' => $adminOther->id]);
+    $patientOther = Patient::factory()->create();
     Invoice::factory()->create([
         'patient_id' => $patientOther->id,
         'invoice_number' => $uniqueNumber,

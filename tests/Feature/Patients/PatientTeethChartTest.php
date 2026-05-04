@@ -14,7 +14,7 @@ beforeEach(function () {
 
     $this->admin = StaffMember::factory()->create(['clinic_access_level' => 'admin']);
     $this->staffMember = StaffMember::factory()->create(['clinic_access_level' => 'staff']);
-    $this->patient = Patient::factory()->create(['assigned_dentist_id' => $this->admin->id]);
+    $this->patient = Patient::factory()->create();
 });
 
 afterEach(function () {
@@ -288,9 +288,9 @@ it('returns both layers separately in show response shape', function () {
         ]);
 });
 
-it('returns 403 for staff on another patients teeth chart', function () {
+it('allows staff to access a patients teeth chart', function () {
     $this->actingAs($this->staffMember, 'clinic_session')
         ->withHeaders(clinicStatefulHeaders($this->clinic))
         ->getJson(clinicApiUrl($this->clinic, "api/patients/{$this->patient->id}/teeth-chart"))
-        ->assertForbidden();
+        ->assertOk();
 });

@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api\Clinic;
 use App\Http\Controllers\Controller;
 use App\Models\Tenant\StaffMember;
 use App\Support\JsonApiResponse;
+use App\Support\StaffAvatarUrl;
 use App\Support\StaffPermissions;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -63,6 +64,8 @@ final class SwitchStaffController extends Controller
             'clinic_access_level' => $staff->clinic_access_level,
             'status' => $staff->status,
             'sign_in_method' => $staff->sign_in_method,
+            'avatar_path' => $staff->avatar_path,
+            'avatar_url' => StaffAvatarUrl::forStaffMember($staff),
         ];
     }
 }

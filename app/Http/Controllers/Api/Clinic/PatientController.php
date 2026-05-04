@@ -16,7 +16,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Enum;
+use Symfony\Component\HttpFoundation\Response;
 
 final class PatientController extends Controller
 {
@@ -40,7 +40,7 @@ final class PatientController extends Controller
         ]);
 
         $query = Patient::query()
-            ->with(['assignedDentist:id,name']);
+            ;
 
         $this->dataScope->scopePatients($query, $staff);
 
@@ -112,7 +112,7 @@ final class PatientController extends Controller
             return $patient;
         });
 
-        $patient->load(['medicalHistory', 'anamnesis', 'assignedDentist:id,name']);
+        $patient->load(['medicalHistory', 'anamnesis']);
 
         return JsonApiResponse::success(
             $this->patientDetailPayload($patient),
@@ -132,7 +132,7 @@ final class PatientController extends Controller
             return $response;
         }
 
-        $patient->load(['medicalHistory', 'anamnesis', 'assignedDentist:id,name']);
+        $patient->load(['medicalHistory', 'anamnesis']);
 
         return JsonApiResponse::success($this->patientDetailPayload($patient), 'OK');
     }
@@ -203,13 +203,29 @@ final class PatientController extends Controller
             }
         });
 
-        $patient->refresh()->load(['medicalHistory', 'anamnesis', 'assignedDentist:id,name']);
+        $patient->refresh()->load(['medicalHistory', 'anamnesis']);
 
         return JsonApiResponse::success($this->patientDetailPayload($patient), 'Patient updated successfully.');
     }
 
+    public function destroy(Patient $patient): Response|JsonResponse
+    {
+        $staff = $this->clinicStaff();
+        if ($staff instanceof JsonResponse) {
+            return $staff;
+        }
+
+        if ($response = $this->guardPatientAccess($this->dataScope, $staff, $patient)) {
+            return $response;
+        }
+
+        $patient->delete();
+
+        return response()->noContent();
+    }
+
     /**
-     * @return array<string, array<int, string|Enum>>
+     * @return array<string, array<int, string|object>>
      */
     private function patientFieldRules(bool $requireName): array
     {
@@ -229,7 +245,6 @@ final class PatientController extends Controller
             'blood_type' => ['sometimes', 'nullable', 'string', 'max:10'],
             'avatar_path' => ['sometimes', 'nullable', 'string', 'max:255'],
             'general_notes' => ['sometimes', 'nullable', 'string'],
-            'assigned_dentist_id' => ['sometimes', 'nullable', 'integer', 'exists:staff_members,id'],
             'last_visit' => ['sometimes', 'nullable', 'date'],
             'status' => ['sometimes', 'nullable', Rule::in(['Active', 'Inactive'])],
             'medical_alert' => ['sometimes', 'nullable', 'string'],
@@ -245,7 +260,7 @@ final class PatientController extends Controller
         $keys = [
             'name', 'surname', 'fathers_name', 'birthday', 'gender', 'phone', 'email',
             'address', 'city', 'personal_number', 'blood_type', 'avatar_path',
-            'general_notes', 'assigned_dentist_id', 'last_visit', 'status', 'medical_alert',
+            'general_notes', 'last_visit', 'status', 'medical_alert',
         ];
 
         return array_intersect_key($validated, array_flip($keys));
@@ -257,7 +272,6 @@ final class PatientController extends Controller
     private function patientDetailPayload(Patient $patient): array
     {
         $base = PatientArraySerializer::patient($patient);
-        $base['assigned_dentist'] = PatientArraySerializer::staffSubset($patient->assignedDentist);
         $base['medical_history'] = PatientArraySerializer::medicalHistory($patient->medicalHistory);
         $base['anamnesis'] = PatientArraySerializer::anamnesis($patient->anamnesis);
 

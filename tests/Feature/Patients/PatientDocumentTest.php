@@ -16,7 +16,7 @@ beforeEach(function () {
 
     $this->admin = StaffMember::factory()->create(['clinic_access_level' => 'admin']);
     $this->staffMember = StaffMember::factory()->create(['clinic_access_level' => 'staff']);
-    $this->patient = Patient::factory()->create(['assigned_dentist_id' => $this->admin->id]);
+    $this->patient = Patient::factory()->create();
 });
 
 afterEach(function () {
@@ -90,9 +90,96 @@ it('deletes document and file', function () {
     expect(PatientDocument::query()->whereKey($doc->id)->exists())->toBeFalse();
 });
 
-it('returns 403 for staff on another patients documents', function () {
+it('allows staff to access patient documents', function () {
     $this->actingAs($this->staffMember, 'clinic_session')
         ->withHeaders(clinicStatefulHeaders($this->clinic))
         ->getJson(clinicApiUrl($this->clinic, "api/patients/{$this->patient->id}/documents"))
-        ->assertForbidden();
+        ->assertOk();
+});
+
+it('downloads patient document when file exists', function () {
+    Storage::fake(config('filesystems.default'));
+    $disk = config('filesystems.default');
+    $segment = TenantPatientStoragePaths::patientDirectorySegment($this->patient);
+    $path = "tenants/test-clinic/patients/{$segment}/documents/keep.pdf";
+    Storage::disk($disk)->put($path, 'file-payload');
+
+    $doc = PatientDocument::query()->create([
+        'patient_id' => $this->patient->id,
+        'name' => 'Keep',
+        'file_name' => 'keep.pdf',
+        'type' => 'application/pdf',
+        'file_path' => $path,
+    ]);
+
+    $response = $this->actingAs($this->admin, 'clinic_session')
+        ->withHeaders(clinicStatefulHeaders($this->clinic))
+        ->get(clinicApiUrl($this->clinic, "api/patients/{$this->patient->id}/documents/{$doc->id}/download"));
+
+    $response->assertOk();
+    expect($response->headers->get('content-disposition'))->toContain('keep.pdf');
+    expect($response->streamedContent())->toBe('file-payload');
+});
+
+it('allows staff to download patient documents', function () {
+    Storage::fake(config('filesystems.default'));
+    $disk = config('filesystems.default');
+    $segment = TenantPatientStoragePaths::patientDirectorySegment($this->patient);
+    $path = "tenants/test-clinic/patients/{$segment}/documents/keep.pdf";
+    Storage::disk($disk)->put($path, 'x');
+
+    $doc = PatientDocument::query()->create([
+        'patient_id' => $this->patient->id,
+        'name' => 'Keep',
+        'file_name' => 'keep.pdf',
+        'type' => 'application/pdf',
+        'file_path' => $path,
+    ]);
+
+    $this->actingAs($this->staffMember, 'clinic_session')
+        ->withHeaders(clinicStatefulHeaders($this->clinic))
+        ->getJson(clinicApiUrl($this->clinic, "api/patients/{$this->patient->id}/documents/{$doc->id}/download"))
+        ->assertOk();
+});
+
+it('returns 404 when document belongs to another patient', function () {
+    Storage::fake(config('filesystems.default'));
+    $disk = config('filesystems.default');
+    $segment = TenantPatientStoragePaths::patientDirectorySegment($this->patient);
+    $path = "tenants/test-clinic/patients/{$segment}/documents/keep.pdf";
+    Storage::disk($disk)->put($path, 'x');
+
+    $doc = PatientDocument::query()->create([
+        'patient_id' => $this->patient->id,
+        'name' => 'Keep',
+        'file_name' => 'keep.pdf',
+        'type' => 'application/pdf',
+        'file_path' => $path,
+    ]);
+
+    $otherPatient = Patient::factory()->create();
+
+    $this->actingAs($this->admin, 'clinic_session')
+        ->withHeaders(clinicStatefulHeaders($this->clinic))
+        ->getJson(clinicApiUrl($this->clinic, "api/patients/{$otherPatient->id}/documents/{$doc->id}/download"))
+        ->assertNotFound();
+});
+
+it('returns 404 when document file is missing on disk', function () {
+    Storage::fake(config('filesystems.default'));
+    $segment = TenantPatientStoragePaths::patientDirectorySegment($this->patient);
+    $path = "tenants/test-clinic/patients/{$segment}/documents/missing.pdf";
+
+    $doc = PatientDocument::query()->create([
+        'patient_id' => $this->patient->id,
+        'name' => 'Missing',
+        'file_name' => 'missing.pdf',
+        'type' => 'application/pdf',
+        'file_path' => $path,
+    ]);
+
+    $this->actingAs($this->admin, 'clinic_session')
+        ->withHeaders(clinicStatefulHeaders($this->clinic))
+        ->getJson(clinicApiUrl($this->clinic, "api/patients/{$this->patient->id}/documents/{$doc->id}/download"))
+        ->assertNotFound();
 });

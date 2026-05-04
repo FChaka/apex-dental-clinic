@@ -63,13 +63,12 @@ it('updates general clinic settings and uploads logo', function () {
 
     $response->assertOk()
         ->assertJsonPath('data.clinic_name', 'New Clinic')
-        ->assertJsonStructure(['data' => ['logo_path']]);
+        ->assertJsonStructure(['data' => ['logo_url']]);
 
     Storage::disk($disk)->assertMissing($oldPath);
 
-    $newPath = $response->json('data.logo_path');
-    expect($newPath)->toBeString();
-    Storage::disk($disk)->assertExists($newPath);
+    $logoUrl = $response->json('data.logo_url');
+    expect($logoUrl)->toBeString()->toStartWith('data:image/');
 });
 
 it('forbids staff from updating general settings', function () {

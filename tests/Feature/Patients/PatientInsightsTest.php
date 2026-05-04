@@ -16,7 +16,7 @@ beforeEach(function () {
 
     $this->admin = StaffMember::factory()->create(['clinic_access_level' => 'admin']);
     $this->staffMember = StaffMember::factory()->create(['clinic_access_level' => 'staff']);
-    $this->patient = Patient::factory()->create(['assigned_dentist_id' => $this->admin->id]);
+    $this->patient = Patient::factory()->create();
 });
 
 afterEach(function () {
@@ -82,9 +82,9 @@ it('returns computed insights', function () {
         ->assertJsonPath('data.last_visit', '2026-04-01');
 });
 
-it('returns 403 for staff on another patients insights', function () {
+it('allows staff to access patient insights', function () {
     $this->actingAs($this->staffMember, 'clinic_session')
         ->withHeaders(clinicStatefulHeaders($this->clinic))
         ->getJson(clinicApiUrl($this->clinic, "api/patients/{$this->patient->id}/insights"))
-        ->assertForbidden();
+        ->assertOk();
 });

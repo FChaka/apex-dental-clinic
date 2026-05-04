@@ -7,7 +7,6 @@ namespace App\Models\Tenant;
 use Database\Factories\Tenant\PatientFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -36,7 +35,6 @@ class Patient extends Model
         'blood_type',
         'avatar_path',
         'general_notes',
-        'assigned_dentist_id',
         'last_visit',
         'status',
         'medical_alert',
@@ -65,9 +63,22 @@ class Patient extends Model
         return $this->hasMany(PatientDocument::class, 'patient_id');
     }
 
+    public function xrays(): HasMany
+    {
+        return $this->hasMany(PatientXray::class, 'patient_id');
+    }
+
     public function patientMonthlyPlans(): HasMany
     {
         return $this->hasMany(PatientMonthlyPlan::class, 'patient_id');
+    }
+
+    /**
+     * For nested route `patients/{patient}/monthly-plans/{plan}` with `scopeBindings()`.
+     */
+    public function plans(): HasMany
+    {
+        return $this->patientMonthlyPlans();
     }
 
     public function teethChartData(): HasMany
@@ -85,19 +96,26 @@ class Patient extends Model
         return $this->hasMany(PatientTreatmentEntry::class, 'patient_id');
     }
 
+    // . These alias was added so scoped bindings can be used for the route `patients/{patient}/treatments/{entry}`
+    public function entries(): HasMany
+    {
+        return $this->treatmentEntries();
+    }
+
     public function paymentRecords(): HasMany
     {
         return $this->hasMany(PatientPaymentRecord::class, 'patient_id');
     }
 
+    // . These alias was added so scoped bindings can be used for the route `patients/{patient}/payments/{payment}`
+    public function payments(): HasMany
+    {
+        return $this->paymentRecords();
+    }
+
     public function appointments(): HasMany
     {
         return $this->hasMany(Appointment::class, 'patient_id');
-    }
-
-    public function assignedDentist(): BelongsTo
-    {
-        return $this->belongsTo(StaffMember::class, 'assigned_dentist_id');
     }
 
     protected static function newFactory(): PatientFactory

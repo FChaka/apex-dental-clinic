@@ -6,6 +6,7 @@ use App\Models\Central\Clinic;
 use App\Models\Tenant\Appointment;
 use App\Models\Tenant\Patient;
 use App\Models\Tenant\StaffMember;
+use App\Models\Tenant\TreatmentType;
 
 beforeEach(function () {
     $this->clinic = createTestTenant('test-clinic');
@@ -292,6 +293,108 @@ it('allows admin to delete any appointment', function () {
         ->withHeaders(clinicStatefulHeaders($this->clinic))
         ->deleteJson(clinicApiUrl($this->clinic, "api/appointments/{$appointment->id}"))
         ->assertNoContent();
+});
+
+it('snapshots duration from selected treatment type on create', function () {
+    $type = TreatmentType::factory()->create([
+        'name' => 'Cleaning',
+        'default_duration' => 30,
+    ]);
+
+    $response = $this->actingAs($this->admin, 'clinic_session')
+        ->withHeaders(clinicStatefulHeaders($this->clinic))
+        ->postJson(clinicApiUrl($this->clinic, 'api/appointments'), [
+            'patient_id' => $this->patient->id,
+            'dentist_id' => $this->dentist->id,
+            'treatment_type_id' => $type->id,
+            'date' => '2026-06-01',
+            'time' => '09:00',
+            'treatment' => 'Cleaning',
+        ]);
+
+    $response->assertCreated()
+        ->assertJsonPath('data.treatment_type_id', $type->id)
+        ->assertJsonPath('data.duration', 30)
+        ->assertJsonPath('data.effective_duration', 30);
+
+    $appointment = Appointment::query()->latest('id')->first();
+    expect($appointment->duration)->toBe(30);
+    expect($appointment->treatment_type_id)->toBe($type->id);
+});
+
+it('lets duration override be passed explicitly on create', function () {
+    $type = TreatmentType::factory()->create([
+        'name' => 'Surgery',
+        'default_duration' => 60,
+    ]);
+
+    $response = $this->actingAs($this->admin, 'clinic_session')
+        ->withHeaders(clinicStatefulHeaders($this->clinic))
+        ->postJson(clinicApiUrl($this->clinic, 'api/appointments'), [
+            'patient_id' => $this->patient->id,
+            'dentist_id' => $this->dentist->id,
+            'treatment_type_id' => $type->id,
+            'date' => '2026-06-01',
+            'time' => '10:00',
+            'treatment' => 'Surgery',
+            'duration' => 75,
+        ]);
+
+    $response->assertCreated()
+        ->assertJsonPath('data.duration', 75)
+        ->assertJsonPath('data.effective_duration', 75);
+
+    $appointment = Appointment::query()->latest('id')->first();
+    expect($appointment->duration)->toBe(75);
+});
+
+it('leaves duration null when type has no default and no override is given', function () {
+    $type = TreatmentType::factory()->create([
+        'name' => 'Consultation',
+        'default_duration' => null,
+    ]);
+
+    $response = $this->actingAs($this->admin, 'clinic_session')
+        ->withHeaders(clinicStatefulHeaders($this->clinic))
+        ->postJson(clinicApiUrl($this->clinic, 'api/appointments'), [
+            'patient_id' => $this->patient->id,
+            'dentist_id' => $this->dentist->id,
+            'treatment_type_id' => $type->id,
+            'date' => '2026-06-01',
+            'time' => '11:00',
+            'treatment' => 'Consultation',
+        ]);
+
+    $response->assertCreated()
+        ->assertJsonPath('data.duration', null)
+        ->assertJsonPath('data.effective_duration', null);
+
+    $appointment = Appointment::query()->latest('id')->first();
+    expect($appointment->duration)->toBeNull();
+});
+
+it('falls back to treatment type default at read time when duration is null', function () {
+    $type = TreatmentType::factory()->create([
+        'name' => 'Filling',
+        'default_duration' => 45,
+    ]);
+    Appointment::factory()->create([
+        'dentist_id' => $this->dentist->id,
+        'treatment_type_id' => $type->id,
+        'duration' => null,
+        'date' => '2026-07-15',
+        'time' => '08:00',
+    ]);
+
+    $response = $this->actingAs($this->admin, 'clinic_session')
+        ->withHeaders(clinicStatefulHeaders($this->clinic))
+        ->getJson(clinicApiUrl($this->clinic, 'api/appointments?date_from=2026-07-15&date_to=2026-07-15'));
+
+    $response->assertOk()
+        ->assertJsonPath('data.0.duration', null)
+        ->assertJsonPath('data.0.effective_duration', 45)
+        ->assertJsonPath('data.0.treatment_type.id', $type->id)
+        ->assertJsonPath('data.0.treatment_type.default_duration', 45);
 });
 
 it('returns 401 when unauthenticated', function () {

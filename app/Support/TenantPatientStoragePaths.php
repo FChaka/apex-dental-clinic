@@ -28,7 +28,6 @@ final class TenantPatientStoragePaths
         return implode('-', $parts).'-'.$id;
     }
 
-
     public static function documentsDirectory(Patient $patient): string
     {
         $tenantSlug = (string) tenancy()->tenant->slug;
@@ -37,6 +36,18 @@ final class TenantPatientStoragePaths
         return "tenants/{$tenantSlug}/patients/{$segment}/documents";
     }
 
+    public static function xrayDirectory(Patient $patient): string
+    {
+        $tenantSlug = (string) tenancy()->tenant->slug;
+        $segment = self::patientDirectorySegment($patient);
+
+        return "tenants/{$tenantSlug}/patients/{$segment}/xrays";
+    }
+
+    public static function xrayThumbsDirectory(Patient $patient): string
+    {
+        return self::xrayDirectory($patient).'/thumbs';
+    }
 
     public static function invoicePdfRelativePath(Invoice $invoice): string
     {

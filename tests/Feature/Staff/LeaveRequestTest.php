@@ -145,3 +145,43 @@ it('staff can delete own request but not others', function () {
         ->deleteJson(clinicApiUrl($this->clinic, "api/leave-requests/{$theirs->id}"))
         ->assertForbidden();
 });
+
+it('admin can create leave request for another staff member', function () {
+    $target = StaffMember::factory()->create(['clinic_access_level' => 'staff']);
+
+    $response = $this->actingAs($this->admin, 'clinic_session')
+        ->withHeaders(clinicStatefulHeaders($this->clinic))
+        ->postJson(clinicApiUrl($this->clinic, 'api/leave-requests'), [
+            'staff_id' => $target->id,
+            'start_date' => '2026-06-01',
+            'end_date' => '2026-06-03',
+            'note' => 'Conference',
+        ]);
+
+    $response->assertCreated()
+        ->assertJsonPath('data.staff_id', $target->id)
+        ->assertJsonPath('data.status', 'Pending');
+
+    expect(LeaveRequest::query()->where('staff_id', $target->id)->exists())->toBeTrue();
+});
+
+it('receptionist can create leave request for another staff member', function () {
+    $receptionist = StaffMember::factory()->create([
+        'clinic_access_level' => 'staff',
+        'role' => 'Receptionist',
+    ]);
+    $target = StaffMember::factory()->create(['clinic_access_level' => 'staff']);
+
+    $response = $this->actingAs($receptionist, 'clinic_session')
+        ->withHeaders(clinicStatefulHeaders($this->clinic))
+        ->postJson(clinicApiUrl($this->clinic, 'api/leave-requests'), [
+            'staff_id' => $target->id,
+            'start_date' => '2026-06-10',
+            'end_date' => '2026-06-12',
+            'note' => 'Sick leave',
+        ]);
+
+    $response->assertCreated()
+        ->assertJsonPath('data.staff_id', $target->id)
+        ->assertJsonPath('data.status', 'Pending');
+});

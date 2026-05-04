@@ -19,6 +19,11 @@ final class ResolveTenantFromHeader
 
         $slug = $request->header('X-Tenant-Slug');
 
+        // For the staff avatar stream endpoint we allow a query param fallback.
+        if (($slug === null || $slug === '') && $request->isMethod('GET') && $request->is('api/staff/*/avatar')) {
+            $slug = $request->query('tenant');
+        }
+
         if ($slug === null || $slug === '') {
             return response()->json(['message' => 'Missing X-Tenant-Slug header.'], 400);
         }

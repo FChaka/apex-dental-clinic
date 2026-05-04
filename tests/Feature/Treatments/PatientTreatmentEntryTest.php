@@ -20,9 +20,7 @@ beforeEach(function () {
     $this->staff = StaffMember::factory()->create([
         'clinic_access_level' => 'staff',
     ]);
-    $this->patient = Patient::factory()->create([
-        'assigned_dentist_id' => $this->admin->id,
-    ]);
+    $this->patient = Patient::factory()->create();
     $this->treatmentType = TreatmentType::factory()->create();
 });
 
@@ -167,11 +165,20 @@ it('returns 422 when deleting a treatment entry linked to an invoice', function 
         ->assertJsonPath('message', 'Cannot delete a treatment entry that is linked to an invoice.');
 });
 
-it('forbids staff without patient access from listing treatments', function () {
+it('allows staff to list treatments for any patient', function () {
+    PatientTreatmentEntry::factory()->create([
+        'patient_id' => $this->patient->id,
+        'treatment_type_id' => $this->treatmentType->id,
+        'dentist_id' => $this->staff->id,
+        'date' => '2026-06-01',
+        'price' => 80.00,
+    ]);
+
     $this->actingAs($this->staff, 'clinic_session')
         ->withHeaders(clinicStatefulHeaders($this->clinic))
         ->getJson(clinicApiUrl($this->clinic, "api/patients/{$this->patient->id}/treatments"))
-        ->assertForbidden();
+        ->assertOk()
+        ->assertJsonCount(1, 'data');
 });
 
 it('returns 401 when unauthenticated', function () {
@@ -181,7 +188,7 @@ it('returns 401 when unauthenticated', function () {
 });
 
 it('returns 404 when entry belongs to another patient', function () {
-    $otherPatient = Patient::factory()->create(['assigned_dentist_id' => $this->admin->id]);
+    $otherPatient = Patient::factory()->create();
     $entry = PatientTreatmentEntry::factory()->create([
         'patient_id' => $otherPatient->id,
         'treatment_type_id' => $this->treatmentType->id,
@@ -208,7 +215,7 @@ it('does not expose other clinic patient treatments', function () {
     $otherClinic = createTestTenant('other-clinic-pt');
     tenancy()->initialize($otherClinic);
     $adminOther = StaffMember::factory()->create(['clinic_access_level' => 'admin']);
-    $patientOther = Patient::factory()->create(['assigned_dentist_id' => $adminOther->id]);
+    $patientOther = Patient::factory()->create();
     $typeOther = TreatmentType::factory()->create();
     PatientTreatmentEntry::factory()->create([
         'patient_id' => $patientOther->id,

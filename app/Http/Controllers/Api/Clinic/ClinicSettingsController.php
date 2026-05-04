@@ -173,6 +173,24 @@ final class ClinicSettingsController extends Controller
         return $staff;
     }
 
+    private function logoDataUrl(?string $path): ?string
+    {
+        if (! is_string($path) || $path === '') {
+            return null;
+        }
+
+        $disk = config('filesystems.default');
+
+        if (! Storage::disk($disk)->exists($path)) {
+            return null;
+        }
+
+        $mime = Storage::disk($disk)->mimeType($path) ?: 'application/octet-stream';
+        $binary = Storage::disk($disk)->get($path);
+
+        return 'data:'.$mime.';base64,'.base64_encode($binary);
+    }
+
     private function isClinicAdmin(StaffMember $staff): bool
     {
         return in_array($staff->clinic_access_level, ['super_admin', 'admin'], true);
@@ -195,7 +213,7 @@ final class ClinicSettingsController extends Controller
             'facebook_url' => $s->facebook_url,
             'instagram_url' => $s->instagram_url,
             'tiktok_url' => $s->tiktok_url,
-            'logo_path' => $s->logo_path,
+            'logo_url' => $this->logoDataUrl($s->logo_path),
             'brand_color' => $s->brand_color,
             'currency' => $s->currency,
             'default_vat' => $s->default_vat,

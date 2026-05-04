@@ -13,7 +13,7 @@ beforeEach(function () {
 
     $this->admin = StaffMember::factory()->create(['clinic_access_level' => 'admin']);
     $this->staffMember = StaffMember::factory()->create(['clinic_access_level' => 'staff']);
-    $this->patient = Patient::factory()->create(['assigned_dentist_id' => $this->admin->id]);
+    $this->patient = Patient::factory()->create();
 });
 
 afterEach(function () {
@@ -75,7 +75,7 @@ it('updates and deletes a plan scoped to patient', function () {
 });
 
 it('returns 404 when plan belongs to another patient', function () {
-    $other = Patient::factory()->create(['assigned_dentist_id' => $this->admin->id]);
+    $other = Patient::factory()->create();
     $plan = PatientMonthlyPlan::query()->create([
         'patient_id' => $other->id,
         'total_amount' => 50,
@@ -92,9 +92,9 @@ it('returns 404 when plan belongs to another patient', function () {
         ->assertNotFound();
 });
 
-it('returns 403 for staff on another patients plans', function () {
+it('allows staff to access patient monthly plans', function () {
     $this->actingAs($this->staffMember, 'clinic_session')
         ->withHeaders(clinicStatefulHeaders($this->clinic))
         ->getJson(clinicApiUrl($this->clinic, "api/patients/{$this->patient->id}/monthly-plans"))
-        ->assertForbidden();
+        ->assertOk();
 });

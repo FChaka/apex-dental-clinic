@@ -13,7 +13,7 @@ beforeEach(function () {
 
     $this->admin = StaffMember::factory()->create(['clinic_access_level' => 'admin']);
     $this->staffMember = StaffMember::factory()->create(['clinic_access_level' => 'staff']);
-    $this->patient = Patient::factory()->create(['assigned_dentist_id' => $this->admin->id]);
+    $this->patient = Patient::factory()->create();
 });
 
 afterEach(function () {
@@ -59,11 +59,11 @@ it('updates medical history', function () {
         ->assertJsonPath('data.notes', 'Updated');
 });
 
-it('returns 403 for staff on another patients medical history', function () {
+it('allows staff to access patient medical history', function () {
     $this->actingAs($this->staffMember, 'clinic_session')
         ->withHeaders(clinicStatefulHeaders($this->clinic))
         ->getJson(clinicApiUrl($this->clinic, "api/patients/{$this->patient->id}/medical-history"))
-        ->assertForbidden();
+        ->assertOk();
 });
 
 it('returns 404 for medical history when patient id missing in tenant', function () {

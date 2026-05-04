@@ -8,6 +8,7 @@ use App\Http\Controllers\Concerns\InteractsWithClinicPatient;
 use App\Http\Controllers\Controller;
 use App\Models\Tenant\Appointment;
 use App\Models\Tenant\StaffMember;
+use App\Models\Tenant\TreatmentType;
 use App\Services\DataScopeService;
 use App\Support\JsonApiResponse;
 use Carbon\CarbonInterface;
@@ -45,6 +46,7 @@ final class AppointmentController extends Controller
             ->with([
                 'patient' => fn ($q) => $q->select('id', 'name', 'surname'),
                 'dentist' => fn ($q) => $q->select('id', 'name', 'color'),
+                'treatmentType' => fn ($q) => $q->select('id', 'name', 'default_duration'),
             ]);
 
         $this->dataScope->scopeAppointments($query, $staff);
@@ -86,9 +88,11 @@ final class AppointmentController extends Controller
         $validated = $request->validate([
             'patient_id' => ['required', 'integer', 'exists:patients,id'],
             'dentist_id' => ['required', 'integer', 'exists:staff_members,id'],
+            'treatment_type_id' => ['nullable', 'integer', 'exists:treatment_types,id'],
             'date' => ['required', 'date'],
             'time' => ['required', 'date_format:H:i'],
             'treatment' => ['required', 'string', 'max:255'],
+            'duration' => ['nullable', 'integer', 'min:1', 'max:1440'],
             'status' => ['sometimes', Rule::in(self::STATUS_VALUES)],
             'notes' => ['nullable', 'string'],
         ]);
@@ -102,12 +106,22 @@ final class AppointmentController extends Controller
             ], 422);
         }
 
+        $duration = $validated['duration'] ?? null;
+        if ($duration === null && ! empty($validated['treatment_type_id'])) {
+            $duration = TreatmentType::query()
+                ->whereKey($validated['treatment_type_id'])
+                ->value('default_duration');
+            $duration = $duration !== null ? (int) $duration : null;
+        }
+
         $appointment = Appointment::query()->create([
             'patient_id' => $validated['patient_id'],
             'dentist_id' => $validated['dentist_id'],
+            'treatment_type_id' => $validated['treatment_type_id'] ?? null,
             'date' => $date,
             'time' => $time,
             'treatment' => $validated['treatment'],
+            'duration' => $duration,
             'status' => $validated['status'] ?? 'Upcoming',
             'notes' => $validated['notes'] ?? null,
         ]);
@@ -115,6 +129,7 @@ final class AppointmentController extends Controller
         $appointment->load([
             'patient' => fn ($q) => $q->select('id', 'name', 'surname'),
             'dentist' => fn ($q) => $q->select('id', 'name', 'color'),
+            'treatmentType' => fn ($q) => $q->select('id', 'name', 'default_duration'),
         ]);
 
         return JsonApiResponse::success($this->appointmentPayload($appointment), 'Appointment created successfully.', 201);
@@ -136,9 +151,11 @@ final class AppointmentController extends Controller
         $validated = $request->validate([
             'patient_id' => ['sometimes', 'integer', 'exists:patients,id'],
             'dentist_id' => ['sometimes', 'integer', 'exists:staff_members,id'],
+            'treatment_type_id' => ['sometimes', 'nullable', 'integer', 'exists:treatment_types,id'],
             'date' => ['sometimes', 'date'],
             'time' => ['sometimes', 'date_format:H:i'],
             'treatment' => ['sometimes', 'string', 'max:255'],
+            'duration' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:1440'],
             'status' => ['sometimes', Rule::in(self::STATUS_VALUES)],
             'notes' => ['nullable', 'string'],
         ]);
@@ -163,6 +180,19 @@ final class AppointmentController extends Controller
             'notes',
         ])));
 
+        if (array_key_exists('treatment_type_id', $validated)) {
+            $appointment->treatment_type_id = $validated['treatment_type_id'];
+        }
+
+        if (array_key_exists('duration', $validated)) {
+            $appointment->duration = $validated['duration'];
+        } elseif (array_key_exists('treatment_type_id', $validated) && $validated['treatment_type_id'] !== null) {
+            $defaultDuration = TreatmentType::query()
+                ->whereKey($validated['treatment_type_id'])
+                ->value('default_duration');
+            $appointment->duration = $defaultDuration !== null ? (int) $defaultDuration : null;
+        }
+
         if (isset($validated['date'])) {
             $appointment->date = $date;
         }
@@ -176,6 +206,7 @@ final class AppointmentController extends Controller
         $appointment->load([
             'patient' => fn ($q) => $q->select('id', 'name', 'surname'),
             'dentist' => fn ($q) => $q->select('id', 'name', 'color'),
+            'treatmentType' => fn ($q) => $q->select('id', 'name', 'default_duration'),
         ]);
 
         return JsonApiResponse::success($this->appointmentPayload($appointment), 'Appointment updated successfully.');
@@ -221,15 +252,19 @@ final class AppointmentController extends Controller
         $row->loadMissing([
             'patient' => fn ($q) => $q->select('id', 'name', 'surname'),
             'dentist' => fn ($q) => $q->select('id', 'name', 'color'),
+            'treatmentType' => fn ($q) => $q->select('id', 'name', 'default_duration'),
         ]);
 
         return [
             'id' => $row->id,
             'patient_id' => $row->patient_id,
             'dentist_id' => $row->dentist_id,
+            'treatment_type_id' => $row->treatment_type_id,
             'date' => $this->normalizeDateString($row->date),
             'time' => $this->formatTimeForApi($row->time),
             'treatment' => $row->treatment,
+            'duration' => $row->duration,
+            'effective_duration' => $row->effective_duration,
             'status' => $row->status,
             'notes' => $row->notes,
             'patient' => $row->patient !== null ? [
@@ -241,6 +276,11 @@ final class AppointmentController extends Controller
                 'id' => $row->dentist->id,
                 'name' => $row->dentist->name,
                 'color' => $row->dentist->color,
+            ] : null,
+            'treatment_type' => $row->treatmentType !== null ? [
+                'id' => $row->treatmentType->id,
+                'name' => $row->treatmentType->name,
+                'default_duration' => $row->treatmentType->default_duration,
             ] : null,
         ];
     }

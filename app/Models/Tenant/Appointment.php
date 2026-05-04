@@ -22,9 +22,11 @@ class Appointment extends Model
     protected $fillable = [
         'patient_id',
         'dentist_id',
+        'treatment_type_id',
         'date',
         'time',
         'treatment',
+        'duration',
         'status',
         'notes',
     ];
@@ -34,6 +36,7 @@ class Appointment extends Model
         return [
             'date' => 'date',
             'time' => 'string',
+            'duration' => 'integer',
         ];
     }
 
@@ -45,6 +48,22 @@ class Appointment extends Model
     public function dentist(): BelongsTo
     {
         return $this->belongsTo(StaffMember::class, 'dentist_id');
+    }
+
+    public function treatmentType(): BelongsTo
+    {
+        return $this->belongsTo(TreatmentType::class, 'treatment_type_id');
+    }
+
+    public function getEffectiveDurationAttribute(): ?int
+    {
+        if ($this->duration !== null) {
+            return (int) $this->duration;
+        }
+
+        $default = $this->treatmentType?->default_duration;
+
+        return $default !== null ? (int) $default : null;
     }
 
     protected static function newFactory(): AppointmentFactory

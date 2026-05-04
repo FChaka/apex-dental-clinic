@@ -51,7 +51,6 @@ final class PatientArraySerializer
             'blood_type' => $patient->blood_type,
             'avatar_path' => $patient->avatar_path,
             'general_notes' => $patient->general_notes,
-            'assigned_dentist_id' => $patient->assigned_dentist_id,
             'last_visit' => self::formatDate($patient->last_visit),
             'status' => $patient->status,
             'medical_alert' => $patient->medical_alert,
@@ -65,10 +64,7 @@ final class PatientArraySerializer
      */
     public static function patientListItem(Patient $patient): array
     {
-        $base = self::patient($patient);
-        $base['assigned_dentist'] = self::staffSubset($patient->relationLoaded('assignedDentist') ? $patient->assignedDentist : null);
-
-        return $base;
+        return self::patient($patient);
     }
 
     /**

@@ -21,9 +21,11 @@ class AppointmentFactory extends Factory
         return [
             'patient_id' => Patient::factory(),
             'dentist_id' => StaffMember::factory(),
+            'treatment_type_id' => null,
             'date' => fake()->date(),
             'time' => '09:00',
             'treatment' => fake()->words(3, true),
+            'duration' => null,
             'status' => 'Upcoming',
             'notes' => null,
         ];
