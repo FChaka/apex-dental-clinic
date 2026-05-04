@@ -23,6 +23,13 @@ use App\Http\Controllers\Api\Clinic\TreatmentTypeController;
 use App\Http\Controllers\Api\Clinic\WidgetPreferenceController;
 use App\Http\Controllers\Auth\ClinicAuthController;
 use App\Http\Controllers\Auth\PlatformAuthController;
+use App\Http\Controllers\Platform\AuditLogController;
+use App\Http\Controllers\Platform\PlatformClinicController;
+use App\Http\Controllers\Platform\PlatformCostCategoryController;
+use App\Http\Controllers\Platform\PlatformOverviewController;
+use App\Http\Controllers\Platform\PlatformServiceController;
+use App\Http\Controllers\Platform\PlatformSpendingController;
+use App\Http\Controllers\Platform\PlatformSubscriptionController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', function () {
@@ -207,14 +214,72 @@ Route::middleware('auth:clinic_session')->group(function () {
         ->scopeBindings();
 });
 
-Route::prefix('platform/auth')->name('api.platform.auth.')->group(function () {
-    Route::post('login', [PlatformAuthController::class, 'login'])->name('login');
+Route::prefix('platform')->group(function () {
+    Route::prefix('auth')->name('api.platform.auth.')->group(function () {
+        Route::post('login', [PlatformAuthController::class, 'login'])->name('login');
 
-    Route::post('logout', [PlatformAuthController::class, 'logout'])
-        ->middleware('auth:platform_session')
-        ->name('logout');
+        Route::middleware('auth:platform_session')->group(function () {
+            Route::post('logout', [PlatformAuthController::class, 'logout'])->name('logout');
 
-    Route::get('me', [PlatformAuthController::class, 'me'])
-        ->middleware('auth:platform_session')
-        ->name('me');
+            Route::get('me', [PlatformAuthController::class, 'me'])->name('me');
+        });
+    });
+
+    Route::middleware('auth:platform_session')->group(function () {
+        Route::get('overview', [PlatformOverviewController::class, 'index'])->name('api.platform.overview');
+
+        Route::post('clinics/{clinic}/resend-owner-pin', [PlatformClinicController::class, 'resendOwnerPin'])
+            ->name('api.platform.clinics.resend-owner-pin');
+        Route::get('clinics/{clinic}/services', [PlatformClinicController::class, 'services'])
+            ->name('api.platform.clinics.services.index');
+        Route::post('clinics/{clinic}/services', [PlatformClinicController::class, 'enableService'])
+            ->name('api.platform.clinics.services.store');
+        Route::put('clinics/{clinic}/services/{clinicService}', [PlatformClinicController::class, 'updateService'])
+            ->name('api.platform.clinics.services.update');
+        Route::get('clinics/{clinic}/usage', [PlatformClinicController::class, 'usage'])
+            ->name('api.platform.clinics.usage');
+        Route::apiResource('clinics', PlatformClinicController::class)->names([
+            'index' => 'api.platform.clinics.index',
+            'store' => 'api.platform.clinics.store',
+            'show' => 'api.platform.clinics.show',
+            'update' => 'api.platform.clinics.update',
+            'destroy' => 'api.platform.clinics.destroy',
+        ]);
+
+        Route::get('subscriptions/{subscription}/invoices', [PlatformSubscriptionController::class, 'invoices'])
+            ->name('api.platform.subscriptions.invoices');
+        Route::apiResource('subscriptions', PlatformSubscriptionController::class)->only(['index', 'store', 'update'])->names([
+            'index' => 'api.platform.subscriptions.index',
+            'store' => 'api.platform.subscriptions.store',
+            'update' => 'api.platform.subscriptions.update',
+        ]);
+
+        Route::get('services/{service}/usage', [PlatformServiceController::class, 'usage'])
+            ->name('api.platform.services.usage');
+        Route::get('services/{service}/profitability', [PlatformServiceController::class, 'profitability'])
+            ->name('api.platform.services.profitability');
+        Route::apiResource('services', PlatformServiceController::class)->names([
+            'index' => 'api.platform.services.index',
+            'store' => 'api.platform.services.store',
+            'update' => 'api.platform.services.update',
+            'destroy' => 'api.platform.services.destroy',
+        ]);
+
+        Route::apiResource('cost-categories', PlatformCostCategoryController::class)->only(['index', 'store', 'update'])->names([
+            'index' => 'api.platform.cost-categories.index',
+            'store' => 'api.platform.cost-categories.store',
+            'update' => 'api.platform.cost-categories.update',
+        ]);
+
+        Route::get('spendings/summary', [PlatformSpendingController::class, 'summary'])
+            ->name('api.platform.spendings.summary');
+        Route::apiResource('spendings', PlatformSpendingController::class)->except(['show'])->names([
+            'index' => 'api.platform.spendings.index',
+            'store' => 'api.platform.spendings.store',
+            'update' => 'api.platform.spendings.update',
+            'destroy' => 'api.platform.spendings.destroy',
+        ]);
+
+        Route::get('audit-log', [AuditLogController::class, 'index'])->name('api.platform.audit-log.index');
+    });
 });

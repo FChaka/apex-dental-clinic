@@ -22,7 +22,6 @@ use Symfony\Component\HttpFoundation\Response;
 
 final class StaffController extends Controller
 {
-
     public function __construct(
         private readonly ClinicAuthService $clinicAuth,
     ) {}
@@ -251,6 +250,8 @@ final class StaffController extends Controller
             $validated['login_password'] = Hash::make($validated['login_password']);
         }
 
+        $credentialUpdated = $this->updateSetsNewCredentials($validated);
+
         $scheduleInput = $validated['working_schedule'] ?? null;
         unset($validated['working_schedule']);
 
@@ -282,6 +283,10 @@ final class StaffController extends Controller
         }
 
         $staff->fill($validated);
+        if ($credentialUpdated) {
+            $staff->temp_pin_expires_at = null;
+            $staff->must_change_credentials = false;
+        }
         $staff->save();
 
         if (is_array($scheduleInput)) {
@@ -339,7 +344,7 @@ final class StaffController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $validated
+     * @param  array<string, mixed>  $validated
      */
     private function updateTouchesSignInSensitiveFields(array $validated, StaffMember $staff): bool
     {
@@ -355,6 +360,22 @@ final class StaffController extends Controller
             return true;
         }
 
+        if (array_key_exists('login_pin', $validated) && is_string($validated['login_pin']) && $validated['login_pin'] !== '') {
+            return true;
+        }
+
+        if (array_key_exists('login_password', $validated) && is_string($validated['login_password']) && $validated['login_password'] !== '') {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     */
+    private function updateSetsNewCredentials(array $validated): bool
+    {
         if (array_key_exists('login_pin', $validated) && is_string($validated['login_pin']) && $validated['login_pin'] !== '') {
             return true;
         }

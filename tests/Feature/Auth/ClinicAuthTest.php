@@ -35,7 +35,7 @@ it('returns staff and permissions on valid clinic PIN login without token', func
     $response->assertOk()
         ->assertJsonMissingPath('data.token')
         ->assertJsonStructure([
-            'data' => ['staff', 'permissions'],
+            'data' => ['staff', 'permissions', 'must_change_credentials'],
             'message',
         ])
         ->assertJsonPath('data.staff.username', 'alice');

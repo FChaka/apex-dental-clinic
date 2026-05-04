@@ -15,6 +15,14 @@ abstract class TenancyFeatureTestCase extends TestCase
     {
         parent::setUp();
 
+        if (config('tenancy.database.template_tenant_connection') === 'sqlite' && $this->app->environment('testing')) {
+            foreach (glob(database_path('apex_clinic_*')) ?: [] as $path) {
+                if (is_file($path)) {
+                    @unlink($path);
+                }
+            }
+        }
+
         if (config('database.connections.central.driver') === 'sqlite') {
             $path = (string) config('database.connections.central.database');
 

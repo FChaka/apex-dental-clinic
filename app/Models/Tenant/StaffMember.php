@@ -42,6 +42,8 @@ class StaffMember extends Authenticatable
         'leave_start',
         'leave_end',
         'paid_by_percentage',
+        'temp_pin_expires_at',
+        'must_change_credentials',
     ];
 
     /**
@@ -62,6 +64,8 @@ class StaffMember extends Authenticatable
             'leave_end' => 'date',
             'pin_length' => 'integer',
             'annual_leave_days' => 'integer',
+            'must_change_credentials' => 'boolean',
+            'temp_pin_expires_at' => 'datetime',
         ];
     }
 
