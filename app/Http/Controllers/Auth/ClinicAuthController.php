@@ -29,6 +29,10 @@ final class ClinicAuthController extends Controller
             return JsonApiResponse::unauthorized('Invalid credentials.');
         }
 
+        if ($staff->temp_pin_expires_at !== null && now()->greaterThan($staff->temp_pin_expires_at)) {
+            return JsonApiResponse::unauthorized('Your temporary PIN has expired. Please contact your clinic administrator to issue a new one.');
+        }
+
         if ($staff->sign_in_method === 'pin') {
             if (! $request->filled('pin')) {
                 throw ValidationException::withMessages([
@@ -50,9 +54,12 @@ final class ClinicAuthController extends Controller
         Auth::guard('clinic_session')->login($staff);
         $request->session()->regenerate();
 
+        $staff->refresh();
+
         return JsonApiResponse::success([
             'staff' => self::serializeStaff($staff),
             'permissions' => StaffPermissions::forStaff($staff),
+            'must_change_credentials' => (bool) $staff->must_change_credentials,
         ], 'Logged in successfully.');
     }
 

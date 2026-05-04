@@ -138,3 +138,63 @@ it('returns 422 when platform login validation fails', function () {
         ])->assertUnprocessable()
         ->assertJsonValidationErrors(['email', 'password']);
 });
+
+it('clinic staff session cannot access platform endpoints', function () {
+    $clinic = createTestTenant();
+    tenancy()->initialize($clinic);
+
+    StaffMember::factory()->create([
+        'username' => 'staffuser',
+        'login_pin' => bcrypt('1111'),
+        'sign_in_method' => 'pin',
+    ]);
+
+    $login = $this->withHeaders(clinicStatefulHeaders($clinic))
+        ->postJson(clinicApiUrl($clinic, 'api/auth/login'), [
+            'username' => 'staffuser',
+            'pin' => '1111',
+        ]);
+
+    $login->assertOk();
+    tenancy()->end();
+
+    $this->withCredentials()
+        ->withCookies(sessionCookiesFromResponse($login))
+        ->withHeaders(platformStatefulHeaders())
+        ->getJson('/api/platform/clinics')
+        ->assertUnauthorized();
+
+    $this->withCredentials()
+        ->withCookies(sessionCookiesFromResponse($login))
+        ->withHeaders(platformStatefulHeaders())
+        ->getJson('/api/platform/overview')
+        ->assertUnauthorized();
+
+    $this->withCredentials()
+        ->withCookies(sessionCookiesFromResponse($login))
+        ->withHeaders(platformStatefulHeaders())
+        ->getJson('/api/platform/subscriptions')
+        ->assertUnauthorized();
+
+    $this->withCredentials()
+        ->withCookies(sessionCookiesFromResponse($login))
+        ->withHeaders(platformStatefulHeaders())
+        ->getJson('/api/platform/spendings')
+        ->assertUnauthorized();
+});
+
+it('platform admin session cannot access clinic endpoints', function () {
+    $clinic = createTestTenant();
+
+    $admin = PlatformAdmin::query()->create([
+        'name' => 'PA',
+        'email' => 'pa@example.com',
+        'password' => 'Secret123!',
+    ]);
+
+    $this->actingAs($admin, 'platform_session');
+
+    $this->withHeaders(clinicStatefulHeaders($clinic))
+        ->getJson(clinicApiUrl($clinic, 'api/auth/me'))
+        ->assertUnauthorized();
+});

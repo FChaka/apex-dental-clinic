@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models\Central;
 
+use Database\Factories\Central\PlatformAdminFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -11,7 +13,8 @@ use Laravel\Sanctum\HasApiTokens;
 
 class PlatformAdmin extends Authenticatable
 {
-    use HasApiTokens, Notifiable, SoftDeletes;
+    /** @use HasFactory<PlatformAdminFactory> */
+    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
     protected $connection = 'central';
 
@@ -39,5 +42,10 @@ class PlatformAdmin extends Authenticatable
         return [
             'password' => 'hashed',
         ];
+    }
+
+    protected static function newFactory(): PlatformAdminFactory
+    {
+        return PlatformAdminFactory::new();
     }
 }

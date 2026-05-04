@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\PlatformLoginRequest;
 use App\Models\Central\PlatformAdmin;
+use App\Services\AuditService;
 use App\Support\JsonApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -29,6 +30,10 @@ final class PlatformAuthController extends Controller
         Auth::guard('platform_session')->login($admin);
         $request->session()->regenerate();
 
+        AuditService::log('platform_admin.login', null, null, [
+            'email' => $admin->email,
+        ]);
+
         return JsonApiResponse::success([
             'admin' => self::serializeAdmin($admin),
         ], 'Logged in successfully.');
@@ -36,6 +41,8 @@ final class PlatformAuthController extends Controller
 
     public function logout(Request $request): JsonResponse
     {
+        AuditService::log('platform_admin.logout');
+
         Auth::guard('platform_session')->logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();

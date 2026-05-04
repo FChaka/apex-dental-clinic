@@ -18,7 +18,12 @@ $__tenantsToDrop = [];
 
 pest()->extend(TenancyFeatureTestCase::class)->in(
     'Feature/Auth/ClinicAuthTest.php',
-    'Feature/Auth/PlatformAuthTest.php',
+    'Feature/Platform/PlatformAuthTest.php',
+    'Feature/Platform/PlatformClinicsTest.php',
+    'Feature/Platform/PlatformOverviewTest.php',
+    'Feature/Platform/PlatformSubscriptionsTest.php',
+    'Feature/Platform/PlatformServicesTest.php',
+    'Feature/Platform/PlatformSpendingsTest.php',
     'Feature/Auth/SwitchStaffTest.php',
     'Feature/Patients/PatientCrudTest.php',
     'Feature/Patients/PatientMedicalHistoryTest.php',
