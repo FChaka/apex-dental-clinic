@@ -5,18 +5,18 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Platform;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Platform\StorePlatformClinicRequest;
 use App\Jobs\SendOwnerWelcomeEmail;
 use App\Models\Central\Clinic;
 use App\Models\Central\ClinicService;
 use App\Models\Central\ClinicUsageRecord;
 use App\Models\Tenant\StaffMember;
 use App\Services\AuditService;
-use App\Services\Platform\TenantDefaultDataService;
+use App\Services\Platform\ClinicProvisioningService;
 use App\Support\JsonApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -51,72 +51,21 @@ final class PlatformClinicController extends Controller
         return JsonApiResponse::paginated($paginator, 'OK');
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StorePlatformClinicRequest $request, ClinicProvisioningService $provisioning): JsonResponse
     {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'slug' => ['required', 'string', 'max:255', 'regex:/^[a-z0-9-]+$/', Rule::unique('clinics', 'slug')],
-            'contact_email' => ['required', 'email', 'max:255'],
-            'plan' => ['required', Rule::in(['Starter', 'Professional', 'Enterprise'])],
-            'seats' => ['sometimes', 'integer', 'min:1', 'max:100'],
-            'owner_name' => ['required', 'string', 'max:255'],
-            'owner_username' => ['required', 'string', 'max:100'],
-            'region' => ['sometimes', 'nullable', 'string', 'max:100'],
-        ]);
+        $validated = $request->validated();
 
-        $slug = $validated['slug'];
-        $dbName = 'apex_clinic_'.str_replace('-', '_', $slug);
-
-        $clinic = DB::connection('central')->transaction(function () use ($validated, $dbName, $slug) {
-            /** @var Clinic $clinic */
-            $clinic = Clinic::query()->create([
-                'name' => $validated['name'],
-                'slug' => $slug,
-                'contact_email' => $validated['contact_email'],
-                'plan' => $validated['plan'],
-                'seats' => $validated['seats'] ?? 5,
-                'region' => $validated['region'] ?? null,
-                'status' => 'trial',
-                'trial_ends_at' => now()->addDays(14),
-                'mrr' => 0,
-                'db_name' => $dbName,
-            ]);
-            $clinic->domains()->create([
-                'domain' => $slug,
-            ]);
-
-            return $clinic->fresh();
-        });
-
-        $temporaryPin = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-        $pinExpiresAt = now()->addHours(24);
-
-        /** @var StaffMember $owner */
-        $owner = $clinic->run(function () use ($validated, $temporaryPin, $pinExpiresAt) {
-            TenantDefaultDataService::seed($validated['name']);
-
-            return StaffMember::query()->create([
-                'name' => $validated['owner_name'],
-                'email' => $validated['contact_email'],
-                'username' => $validated['owner_username'],
-                'role' => 'Dentist',
-                'clinic_access_level' => 'super_admin',
-                'status' => 'Active',
-                'sign_in_method' => 'pin',
-                'pin_length' => 6,
-                'login_pin' => $temporaryPin,
-                'temp_pin_expires_at' => $pinExpiresAt,
-                'must_change_credentials' => true,
-            ]);
-        });
+        $clinic = $provisioning->createCentralClinic($validated);
+        $slug = (string) $validated['slug'];
+        $bootstrap = $provisioning->bootstrapNewClinicTenant($clinic, $validated);
 
         SendOwnerWelcomeEmail::dispatch(
             $validated['contact_email'],
             $validated['owner_name'],
             $validated['owner_username'],
-            $temporaryPin,
+            $bootstrap['temporary_pin'],
             $slug,
-            $pinExpiresAt->toIso8601String(),
+            $bootstrap['pin_expires_at']->toIso8601String(),
         );
 
         AuditService::log('clinic.created', $clinic->id, null, [

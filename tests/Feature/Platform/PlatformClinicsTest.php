@@ -7,6 +7,7 @@ use App\Models\Central\Clinic;
 use App\Models\Central\PlatformAdmin;
 use App\Models\Central\PlatformService;
 use App\Models\Tenant\StaffMember;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
 
@@ -61,7 +62,7 @@ it('creates a clinic and provisions tenant DB', function () {
         expect($owner->login_pin)->not->toBeNull();
         expect($owner->must_change_credentials)->toBeTrue();
         expect($owner->temp_pin_expires_at)->not->toBeNull();
-        expect(\Carbon\Carbon::parse((string) $owner->temp_pin_expires_at)->greaterThan(now()))->toBeTrue();
+        expect(Carbon::parse((string) $owner->temp_pin_expires_at)->greaterThan(now()))->toBeTrue();
     });
 
     $this->assertDatabaseHas('audit_log', ['action' => 'clinic.created'], 'central');

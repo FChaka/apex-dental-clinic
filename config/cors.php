@@ -3,10 +3,12 @@
 $platformDomain = trim((string) env('APP_PLATFORM_DOMAIN', 'apex.com'));
 
 $patterns = [
+    '#^http://localhost(:\d+)?$#',
     '#^http://[\w-]+\.localhost(:\d+)?$#',
 ];
 
 if ($platformDomain !== '') {
+    $patterns[] = '#^https://'.preg_quote($platformDomain, '#').'$#';
     $patterns[] = '#^https://[\w-]+\.'.preg_quote($platformDomain, '#').'$#';
 }
 
