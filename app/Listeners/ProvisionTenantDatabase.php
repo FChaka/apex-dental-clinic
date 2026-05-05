@@ -23,24 +23,24 @@ class ProvisionTenantDatabase
 
         $databaseManager = app(DatabaseManager::class);
 
-        // In testing, remove leftover DB from a prior crashed run so CreateDatabase won't throw.
-        if (app()->environment('testing')) {
-            $manager = $tenant->database()->manager();
-            if ($manager->databaseExists($tenant->database()->getName())) {
-                $manager->deleteDatabase($tenant);
-            }
+    
+        $manager = $tenant->database()->manager();
+        if ($manager->databaseExists($tenant->database()->getName())) {
+            $manager->deleteDatabase($tenant);
         }
 
         (new CreateDatabase($tenant))->handle($databaseManager);
 
         tenancy()->initialize($tenant);
 
-        Artisan::call('migrate', [
-            '--path' => database_path('migrations/tenant'),
-            '--realpath' => true,
-            '--force' => true,
-        ]);
-
-        tenancy()->end();
+        try {
+            Artisan::call('migrate', [
+                '--path' => database_path('migrations/tenant'),
+                '--realpath' => true,
+                '--force' => true,
+            ]);
+        } finally {
+            tenancy()->end();
+        }
     }
 }
