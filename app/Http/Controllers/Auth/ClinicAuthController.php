@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\ClinicLoginRequest;
+use App\Models\Central\Clinic;
 use App\Models\Tenant\StaffMember;
 use App\Services\Auth\ClinicAuthService;
 use App\Support\JsonApiResponse;
@@ -15,6 +16,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
+use Stancl\Tenancy\Tenancy;
 
 /**
  * Clinic JSON auth. Validation failures return 422 with Laravel's default `errors` shape.
@@ -59,6 +61,7 @@ final class ClinicAuthController extends Controller
         return JsonApiResponse::success([
             'staff' => self::serializeStaff($staff),
             'permissions' => StaffPermissions::forStaff($staff),
+            'clinic' => self::serializeClinic(),
             'must_change_credentials' => (bool) $staff->must_change_credentials,
         ], 'Logged in successfully.');
     }
@@ -83,7 +86,31 @@ final class ClinicAuthController extends Controller
         return JsonApiResponse::success([
             'staff' => self::serializeStaff($staff),
             'permissions' => StaffPermissions::forStaff($staff),
+            'clinic' => self::serializeClinic(),
         ], 'OK');
+    }
+
+    /**
+     * @return array{status: string|null, trial_ends_at: string|null}|null
+     */
+    private static function serializeClinic(): ?array
+    {
+        if (! app(Tenancy::class)->initialized) {
+            return null;
+        }
+
+        $clinic = tenant();
+
+        if (! $clinic instanceof Clinic) {
+            return null;
+        }
+
+        $trialEndsAt = $clinic->trial_ends_at;
+
+        return [
+            'status' => $clinic->getAttribute('status'),
+            'trial_ends_at' => $trialEndsAt?->toIso8601String(),
+        ];
     }
 
     /**

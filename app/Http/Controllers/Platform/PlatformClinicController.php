@@ -87,13 +87,13 @@ final class PlatformClinicController extends Controller
         $usageSummary = ClinicUsageRecord::query()
             ->where('clinic_id', $clinic->id)
             ->where('month', $currentMonth)
-            ->selectRaw('COUNT(*) as rows, COALESCE(SUM(total_cost), 0) as total_billed')
+            ->selectRaw('COUNT(*) as row_count, COALESCE(SUM(total_cost), 0) as total_billed')
             ->first();
 
         $data = $this->serializeClinicDetail($clinic);
         $data['usage_summary'] = [
             'month' => $currentMonth,
-            'line_items' => (int) $usageSummary->rows,
+            'line_items' => (int) $usageSummary->row_count,
             'total_billed' => (float) $usageSummary->total_billed,
         ];
 
@@ -114,6 +114,15 @@ final class PlatformClinicController extends Controller
         $previousStatus = (string) $clinic->status;
 
         $clinic->fill($validated);
+
+        if (
+            array_key_exists('status', $validated)
+            && $previousStatus === 'trial'
+            && in_array($validated['status'], ['active', 'suspended'], true)
+        ) {
+            $clinic->trial_ends_at = null;
+        }
+
         $clinic->save();
 
         AuditService::log('clinic.updated', $clinic->id, null, [

@@ -150,6 +150,34 @@ it('soft-deletes a clinic', function () {
     expect($clinic->fresh()->deleted_at)->not->toBeNull();
 });
 
+it('clears trial_ends_at when moving from trial to active or suspended', function () {
+    $clinic = Clinic::factory()->create([
+        'status' => 'trial',
+        'trial_ends_at' => now()->addDays(3),
+    ]);
+
+    $this->putJson("/api/platform/clinics/{$clinic->id}", [
+        'status' => 'active',
+    ])->assertOk();
+
+    $clinic->refresh();
+    expect($clinic->status)->toBe('active');
+    expect($clinic->trial_ends_at)->toBeNull();
+
+    $clinic->forceFill([
+        'status' => 'trial',
+        'trial_ends_at' => now()->addDays(3),
+    ])->save();
+
+    $this->putJson("/api/platform/clinics/{$clinic->id}", [
+        'status' => 'suspended',
+    ])->assertOk();
+
+    $clinic->refresh();
+    expect($clinic->status)->toBe('suspended');
+    expect($clinic->trial_ends_at)->toBeNull();
+});
+
 it('rejects unauthenticated requests', function () {
     $this->app['auth']->forgetGuards();
 

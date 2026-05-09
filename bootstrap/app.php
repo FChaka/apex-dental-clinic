@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\CheckClinicStatus;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\ResolveTenantFromHeader;
 use Illuminate\Foundation\Application;
@@ -23,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->api(prepend: [
             ResolveTenantFromHeader::class,
+            CheckClinicStatus::class,
             EnsureFrontendRequestsAreStateful::class,
         ]);
 
