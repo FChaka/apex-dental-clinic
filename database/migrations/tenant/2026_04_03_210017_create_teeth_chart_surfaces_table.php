@@ -13,7 +13,7 @@ return new class extends Migration
             $table->foreignId('patient_id')->constrained('patients')->cascadeOnDelete();
             $table->string('tooth_number', 10);
             $table->string('surface_key', 20);
-            $table->json('values')->default('[]');
+            $table->json('values')->nullable()->default(null);
             $table->boolean('is_initial_exam')->default(false);
             $table->timestamps();
 
