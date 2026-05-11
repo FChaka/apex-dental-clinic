@@ -1,0 +1,65 @@
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# Node
+node_modules
+
+# Composer vendor (installed fresh in Docker)
+vendor
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Frontend build artifacts (built in Docker)
+public/build
+public/hot
+
+# Storage (runtime data — not baked into image)
+storage/app/public/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/testing/*
+storage/framework/views/*
+storage/logs/*
+!storage/app/public/.gitignore
+!storage/framework/cache/.gitignore
+!storage/framework/cache/data/.gitignore
+!storage/framework/sessions/.gitignore
+!storage/framework/testing/.gitignore
+!storage/framework/views/.gitignore
+!storage/logs/.gitignore
+
+# Bootstrap cache (regenerated at runtime)
+bootstrap/cache/*.php
+
+# IDE / editor files
+.idea
+.vscode
+.cursor
+.nova
+.fleet
+.zed
+*.swp
+*.swo
+.DS_Store
+
+# Docker files themselves
+Dockerfile
+.dockerignore
+docker-entrypoint.sh
+
+# CI / docs
+.github
+*.md
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+boost.json
+
+# Test artifacts
+.phpunit.result.cache
+.phpunit.cache
