@@ -25,6 +25,8 @@ final class StaffDocumentController extends Controller
             return $auth;
         }
 
+        $this->authorizeForUser($auth, 'view', $staff);
+
         $items = StaffDocument::query()
             ->where('staff_id', $staff->id)
             ->orderByDesc('id')

@@ -24,6 +24,31 @@ afterEach(function () {
     tenancy()->end();
 });
 
+it('forbids peers from listing documents for Off Duty colleague', function () {
+    Storage::fake(config('filesystems.default'));
+
+    $offDuty = StaffMember::factory()->create(['status' => 'Off Duty']);
+    StaffDocument::query()->create([
+        'staff_id' => $offDuty->id,
+        'name' => 'Hidden',
+        'type' => 'license',
+        'file_name' => 'a.pdf',
+        'file_path' => 'x.pdf',
+        'uploaded_at' => now(),
+    ]);
+
+    $this->actingAs($this->staff, 'clinic_session')
+        ->withHeaders(clinicStatefulHeaders($this->clinic))
+        ->getJson(clinicApiUrl($this->clinic, "api/staff/{$offDuty->id}/documents"))
+        ->assertForbidden();
+
+    $this->actingAs($this->admin, 'clinic_session')
+        ->withHeaders(clinicStatefulHeaders($this->clinic))
+        ->getJson(clinicApiUrl($this->clinic, "api/staff/{$offDuty->id}/documents"))
+        ->assertSuccessful()
+        ->assertJsonPath('data.0.name', 'Hidden');
+});
+
 it('lists staff documents for all roles', function () {
     StaffDocument::query()->create([
         'staff_id' => $this->target->id,
