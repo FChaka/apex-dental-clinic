@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models\Tenant;
 
+use App\Support\ClinicAppTimezone;
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Database\Factories\Tenant\AppointmentFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -37,7 +40,25 @@ class Appointment extends Model
             'date' => 'date',
             'time' => 'string',
             'duration' => 'integer',
+            'starts_at' => 'immutable_datetime:UTC',
+            'notification_sent' => 'boolean',
         ];
+    }
+
+    public static function computeStartsAtUtcFromDateAndTime(mixed $date, string $time): ?CarbonImmutable
+    {
+        $trimmedTime = trim($time);
+        if ($date === null || $trimmedTime === '') {
+            return null;
+        }
+
+        $dateStr = $date instanceof CarbonInterface ? $date->format('Y-m-d') : (string) $date;
+
+        try {
+            return CarbonImmutable::parse($dateStr.' '.$trimmedTime, ClinicAppTimezone::current())->utc();
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     public function patient(): BelongsTo

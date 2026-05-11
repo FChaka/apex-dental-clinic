@@ -17,11 +17,28 @@ final class ResolveTenantFromHeader
             return $next($request);
         }
 
-        $slug = $request->header('X-Tenant-Slug');
+        $slugFromHeader = $this->normalizedSlug($request->header('X-Tenant-Slug'));
 
         // For the staff avatar stream endpoint we allow a query param fallback.
-        if (($slug === null || $slug === '') && $request->isMethod('GET') && $request->is('api/staff/*/avatar')) {
-            $slug = $request->query('tenant');
+        $slugFromAvatar = null;
+        if ($request->isMethod('GET') && $request->is('api/staff/*/avatar')) {
+            $slugFromAvatar = $this->normalizedSlug($request->query('tenant'));
+        }
+
+        $slugFromBroadcastingHost = $this->validatedBroadcastingSlugFromHost($request);
+
+        if ($request->is('broadcasting/*')) {
+            if ($slugFromHeader !== null
+                && $slugFromBroadcastingHost !== null
+                && $slugFromHeader !== $slugFromBroadcastingHost) {
+                return response()->json(['message' => 'X-Tenant-Slug does not match tenant host.'], 400);
+            }
+        }
+
+        $slug = $slugFromHeader ?? $slugFromAvatar;
+
+        if (($slug === null || $slug === '') && $request->is('broadcasting/*')) {
+            $slug = $slugFromBroadcastingHost;
         }
 
         if ($slug === null || $slug === '') {
@@ -40,5 +57,46 @@ final class ResolveTenantFromHeader
         tenancy()->initialize($domain->tenant);
 
         return $next($request);
+    }
+
+    private function normalizedSlug(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $trimmed = trim($value);
+
+        return $trimmed === '' ? null : $trimmed;
+    }
+
+    private function validatedBroadcastingSlugFromHost(Request $request): ?string
+    {
+        if (! $request->is('broadcasting/*')) {
+            return null;
+        }
+
+        $host = $request->getHost();
+        $centralDomains = config('tenancy.central_domains', []);
+
+        if (in_array($host, $centralDomains, true)) {
+            return null;
+        }
+
+        if (filter_var($host, FILTER_VALIDATE_IP)) {
+            return null;
+        }
+
+        $candidate = strtolower(explode('.', $host, 2)[0] ?? '');
+
+        if ($candidate === '') {
+            return null;
+        }
+
+        /** @var class-string<Model> $domainModel */
+        $domainModel = config('tenancy.domain_model');
+        $exists = $domainModel::query()->where('domain', $candidate)->exists();
+
+        return $exists ? $candidate : null;
     }
 }

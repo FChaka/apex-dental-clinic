@@ -45,6 +45,8 @@ pest()->extend(TenancyFeatureTestCase::class)->in(
     'Feature/Staff/StaffDocumentTest.php',
     'Feature/Staff/LeaveRequestTest.php',
     'Feature/Preferences/WidgetPreferenceTest.php',
+    'Feature/Notifications/BroadcastingAuthTest.php',
+    'Feature/Notifications/NotificationTest.php',
 );
 
 /*

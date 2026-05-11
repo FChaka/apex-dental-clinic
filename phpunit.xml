@@ -32,6 +32,7 @@
         <env name="SANCTUM_STATEFUL_DOMAINS" value="apex.test,.apex.test,api.apex.test,*.apex.test" force="true"/>
         <env name="SESSION_DOMAIN" value=".apex.test" force="true"/>
         <env name="MAIL_MAILER" value="array" force="true"/>
+        <env name="BROADCAST_CONNECTION" value="null" force="true"/>
         <env name="PULSE_ENABLED" value="false" force="true"/>
         <env name="QUEUE_CONNECTION" value="sync" force="true"/>
         <env name="SESSION_DRIVER" value="array" force="true"/>
