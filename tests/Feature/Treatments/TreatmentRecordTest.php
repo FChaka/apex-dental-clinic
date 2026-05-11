@@ -223,3 +223,21 @@ it('does not expose other clinic treatment records', function () {
     $response->assertOk();
     expect($response->getContent())->not->toContain($uniqueName);
 });
+
+it('keeps pagination parameters working on the index regression', function () {
+    TreatmentRecord::factory()->count(25)->create([
+        'patient_id' => $this->patient->id,
+        'dentist_id' => $this->dentist->id,
+    ]);
+
+    $response = $this->actingAs($this->admin, 'clinic_session')
+        ->withHeaders(clinicStatefulHeaders($this->clinic))
+        ->getJson(clinicApiUrl($this->clinic, 'api/treatment-records?page=2'));
+
+    $response->assertOk()
+        ->assertJsonPath('meta.per_page', 20)
+        ->assertJsonPath('meta.current_page', 2)
+        ->assertJsonPath('meta.total', 25);
+
+    expect($response->json('data'))->toHaveCount(5);
+});

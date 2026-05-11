@@ -298,6 +298,33 @@ it('soft deletes staff when allowed', function () {
     expect(StaffMember::withTrashed()->find($target->id)?->deleted_at)->not->toBeNull();
 });
 
+it('forbids non-admin peers from viewing Off Duty colleague until reactivated', function () {
+    $viewer = StaffMember::factory()->create([
+        'clinic_access_level' => 'staff',
+        'role' => 'Dentist',
+        'status' => 'Active',
+    ]);
+    $offDuty = StaffMember::factory()->create([
+        'clinic_access_level' => 'staff',
+        'role' => 'Dentist',
+        'status' => 'Off Duty',
+    ]);
+
+    $this->actingAs($viewer, 'clinic_session')
+        ->withHeaders(clinicStatefulHeaders($this->clinic))
+        ->getJson(clinicApiUrl($this->clinic, "api/staff/{$offDuty->id}"))
+        ->assertForbidden();
+
+    $this->actingAs($this->admin, 'clinic_session')
+        ->withHeaders(clinicStatefulHeaders($this->clinic))
+        ->putJson(clinicApiUrl($this->clinic, "api/staff/{$offDuty->id}"), ['status' => 'Active']);
+
+    $this->actingAs($viewer, 'clinic_session')
+        ->withHeaders(clinicStatefulHeaders($this->clinic))
+        ->getJson(clinicApiUrl($this->clinic, "api/staff/{$offDuty->id}"))
+        ->assertSuccessful();
+});
+
 it('returns avatar_url as /api stream URL when avatar exists only on local disk', function () {
     $defaultDisk = (string) config('filesystems.default');
     Storage::fake($defaultDisk);

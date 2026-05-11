@@ -6,10 +6,12 @@ namespace App\Http\Controllers\Api\Clinic;
 
 use App\Events\StaffScheduleChanged;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Tenant\StaffProfileSummaryRequest;
 use App\Models\Tenant\Appointment;
 use App\Models\Tenant\StaffMember;
 use App\Models\Tenant\StaffWorkingSchedule;
 use App\Services\Auth\ClinicAuthService;
+use App\Services\StaffProfileSummaryService;
 use App\Support\JsonApiResponse;
 use App\Support\StaffAvatarUrl;
 use Illuminate\Http\JsonResponse;
@@ -25,6 +27,7 @@ final class StaffController extends Controller
 {
     public function __construct(
         private readonly ClinicAuthService $clinicAuth,
+        private readonly StaffProfileSummaryService $staffProfileSummary,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -123,6 +126,8 @@ final class StaffController extends Controller
             return $auth;
         }
 
+        $this->authorizeForUser($auth, 'view', $staff);
+
         $path = $staff->avatar_path;
         if (! is_string($path) || $path === '') {
             return response()->json(['message' => 'Avatar not found.'], 404);
@@ -147,12 +152,45 @@ final class StaffController extends Controller
         ]);
     }
 
+    /**
+     * GET /api/staff/{staff}/profile-summary — §7.5.1.
+     *
+     * Query (optional): treatments_period (`month`|`year`|`all`, default month), revenue_period (same enum; omit to mirror treatments_period),
+     * appointments_limit (1–100, default 50).
+     *
+     * Response `data` keys: summary, treatments_by_type, recent_appointments, revenue — see {@see StaffProfileSummaryService::build()}
+     */
+    public function profileSummary(StaffProfileSummaryRequest $request, StaffMember $staff): JsonResponse
+    {
+        $auth = $this->clinicStaff();
+        if ($auth instanceof JsonResponse) {
+            return $auth;
+        }
+
+        $this->authorizeForUser($auth, 'view', $staff);
+
+        /** @var array{treatments_period: string, appointments_limit: int, revenue_period?: string} $validated */
+        $validated = $request->validated();
+        $treatmentsPeriod = (string) $validated['treatments_period'];
+        $revenuePeriod = isset($validated['revenue_period'])
+            ? (string) $validated['revenue_period']
+            : $treatmentsPeriod;
+        $appointmentsLimit = (int) $validated['appointments_limit'];
+
+        return JsonApiResponse::success(
+            $this->staffProfileSummary->build($staff, $treatmentsPeriod, $revenuePeriod, $appointmentsLimit),
+            'OK'
+        );
+    }
+
     public function show(StaffMember $staff): JsonResponse
     {
         $auth = $this->clinicStaff();
         if ($auth instanceof JsonResponse) {
             return $auth;
         }
+
+        $this->authorizeForUser($auth, 'view', $staff);
 
         $staff->load([
             'workingSchedules' => fn ($q) => $q->orderBy('day_of_week'),

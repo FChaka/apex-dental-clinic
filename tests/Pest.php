@@ -6,6 +6,7 @@ use App\Models\Central\Clinic;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
 use Tests\TenancyFeatureTestCase;
+use Tests\TestCase;
 
 /** @var array<int, Clinic> */
 $__tenantsToDrop = [];
@@ -37,17 +38,26 @@ pest()->extend(TenancyFeatureTestCase::class)->in(
     'Feature/Treatments/TreatmentTypeTest.php',
     'Feature/Treatments/PatientTreatmentEntryTest.php',
     'Feature/Treatments/TreatmentRecordTest.php',
+    'Feature/Dashboard/DashboardStatsTest.php',
+    'Feature/Dashboard/WeeklyAppointmentsTest.php',
+    'Feature/Dashboard/MonthlyRevenueTest.php',
+    'Feature/Reports/DailyReportTest.php',
+    'Feature/Reports/DailyReportScopeTest.php',
+    'Feature/Reports/ReportsOverviewTest.php',
     'Feature/Billing/PatientPaymentRecordTest.php',
     'Feature/Billing/InvoiceTest.php',
     'Feature/Settings/ClinicSettingsTest.php',
     'Feature/Settings/ClinicScheduleTest.php',
     'Feature/Staff/StaffCrudTest.php',
+    'Feature/Staff/StaffProfileSummaryTest.php',
     'Feature/Staff/StaffDocumentTest.php',
     'Feature/Staff/LeaveRequestTest.php',
     'Feature/Preferences/WidgetPreferenceTest.php',
     'Feature/Notifications/BroadcastingAuthTest.php',
     'Feature/Notifications/NotificationTest.php',
 );
+
+pest()->extend(TestCase::class)->in('Unit');
 
 /*
 |--------------------------------------------------------------------------

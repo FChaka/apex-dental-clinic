@@ -8,6 +8,7 @@ use App\Support\ClinicAppTimezone;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Database\Factories\Tenant\AppointmentFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -59,6 +60,17 @@ class Appointment extends Model
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    /**
+     * @param  Builder<Appointment>  $query
+     * @return Builder<Appointment>
+     */
+    public function scopeClinicalOnly(Builder $query): Builder
+    {
+        return $query->whereHas('dentist', function (Builder $q): void {
+            $q->whereIn('role', ['Dentist', 'Dental Hygienist']);
+        });
     }
 
     public function patient(): BelongsTo

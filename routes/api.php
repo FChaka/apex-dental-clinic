@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\Clinic\AppointmentController;
 use App\Http\Controllers\Api\Clinic\ClinicScheduleController;
 use App\Http\Controllers\Api\Clinic\ClinicSettingsController;
+use App\Http\Controllers\Api\Clinic\DashboardController;
 use App\Http\Controllers\Api\Clinic\InvoiceController;
 use App\Http\Controllers\Api\Clinic\LeaveRequestController;
 use App\Http\Controllers\Api\Clinic\NotificationController;
@@ -16,6 +17,7 @@ use App\Http\Controllers\Api\Clinic\PatientPaymentRecordController;
 use App\Http\Controllers\Api\Clinic\PatientTeethChartController;
 use App\Http\Controllers\Api\Clinic\PatientTreatmentEntryController;
 use App\Http\Controllers\Api\Clinic\PatientXrayController;
+use App\Http\Controllers\Api\Clinic\ReportsController;
 use App\Http\Controllers\Api\Clinic\StaffController;
 use App\Http\Controllers\Api\Clinic\StaffDocumentController;
 use App\Http\Controllers\Api\Clinic\SwitchStaffController;
@@ -73,6 +75,7 @@ Route::middleware('auth:clinic_session')->group(function () {
     Route::get('/staff', [StaffController::class, 'index'])->name('api.staff.index');
     Route::post('/staff', [StaffController::class, 'store'])->name('api.staff.store');
     Route::get('/staff/{staff}/avatar', [StaffController::class, 'avatar'])->name('api.staff.avatar');
+    Route::get('/staff/{staff}/profile-summary', [StaffController::class, 'profileSummary'])->name('api.staff.profile-summary');
     Route::get('/staff/{staff}', [StaffController::class, 'show'])->name('api.staff.show');
     Route::put('/staff/{staff}', [StaffController::class, 'update'])->name('api.staff.update');
     Route::delete('/staff/{staff}', [StaffController::class, 'destroy'])->name('api.staff.destroy');
@@ -97,6 +100,13 @@ Route::middleware('auth:clinic_session')->group(function () {
     // Widget preferences
     Route::get('/preferences/widgets', [WidgetPreferenceController::class, 'show'])->name('api.preferences.widgets.show');
     Route::put('/preferences/widgets', [WidgetPreferenceController::class, 'update'])->name('api.preferences.widgets.update');
+
+    // Dashboard & reports aggregates
+    Route::get('/dashboard/stats', [DashboardController::class, 'stats'])->name('api.dashboard.stats');
+    Route::get('/dashboard/weekly-appointments', [DashboardController::class, 'weeklyAppointments'])->name('api.dashboard.weekly-appointments');
+    Route::get('/dashboard/monthly-revenue', [DashboardController::class, 'monthlyRevenue'])->name('api.dashboard.monthly-revenue');
+    Route::get('/reports/overview', [ReportsController::class, 'overview'])->name('api.reports.overview');
+    Route::get('/reports/daily', [ReportsController::class, 'daily'])->name('api.reports.daily');
 
     // Appointment Routes
     Route::get('/appointments', [AppointmentController::class, 'index'])->name('api.appointments.index');
