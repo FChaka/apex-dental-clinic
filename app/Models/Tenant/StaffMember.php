@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models\Tenant;
 
+use App\Http\Controllers\Api\Clinic\LeaveRequestController;
 use Database\Factories\Tenant\StaffMemberFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -54,6 +56,19 @@ class StaffMember extends Authenticatable
         'login_password',
     ];
 
+    /**
+     * Staff who receive alerts when others submit leave requests ({@see LeaveRequestController::canManageOtherLeave}).
+     *
+     * @param  Builder<StaffMember>  $query
+     * @return Builder<StaffMember>
+     */
+    public function scopeForLeaveManagementAlerts(Builder $query): Builder
+    {
+        return $query
+            ->where('status', 'Active')
+            ->whereIn('clinic_access_level', ['super_admin', 'admin']);
+    }
+
     protected function casts(): array
     {
         return [
@@ -91,6 +106,14 @@ class StaffMember extends Authenticatable
     public function percentagePerTreatment(): HasMany
     {
         return $this->hasMany(StaffPercentagePerTreatment::class, 'staff_id');
+    }
+
+    /**
+     * @return HasMany<Notification, $this>
+     */
+    public function notifications(): HasMany
+    {
+        return $this->hasMany(Notification::class, 'receiver_staff_id');
     }
 
     public function getAuthPassword(): ?string

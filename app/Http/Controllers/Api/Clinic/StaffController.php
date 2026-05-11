@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\Clinic;
 
+use App\Events\StaffScheduleChanged;
 use App\Http\Controllers\Controller;
 use App\Models\Tenant\Appointment;
 use App\Models\Tenant\StaffMember;
@@ -289,16 +290,37 @@ final class StaffController extends Controller
         }
         $staff->save();
 
-        if (is_array($scheduleInput)) {
+        $scheduleChanged = false;
+        if (is_array($scheduleInput) && $canAdminUpdate) {
             foreach ($scheduleInput as $day) {
+                $row = StaffWorkingSchedule::query()
+                    ->where('staff_id', $staff->id)
+                    ->where('day_of_week', $day['day_of_week'])
+                    ->first();
+
+                $newOpen = (bool) $day['is_open'];
+                $newStart = (int) $day['start_hour'];
+                $newEnd = (int) $day['end_hour'];
+
+                if ($row === null
+                    || (bool) $row->is_open !== $newOpen
+                    || (int) $row->start_hour !== $newStart
+                    || (int) $row->end_hour !== $newEnd) {
+                    $scheduleChanged = true;
+                }
+
                 StaffWorkingSchedule::query()->updateOrCreate(
                     ['staff_id' => $staff->id, 'day_of_week' => $day['day_of_week']],
                     [
-                        'is_open' => $day['is_open'],
-                        'start_hour' => $day['start_hour'],
-                        'end_hour' => $day['end_hour'],
+                        'is_open' => $newOpen,
+                        'start_hour' => $newStart,
+                        'end_hour' => $newEnd,
                     ],
                 );
+            }
+
+            if ($scheduleChanged) {
+                event(new StaffScheduleChanged($staff, $auth));
             }
         }
 

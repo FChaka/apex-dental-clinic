@@ -53,4 +53,29 @@ final class JsonApiResponse
             'message' => $message,
         ], 401);
     }
+
+    /**
+     * Notifications index: paginated list with top-level unread_count (matches SPA expectations).
+     *
+     * @param  LengthAwarePaginator<int, mixed>  $paginator
+     * @param  list<array<string, mixed>>  $serializedItems
+     */
+    public static function notificationsIndex(
+        LengthAwarePaginator $paginator,
+        array $serializedItems,
+        int $unreadCount,
+        string $message = 'OK',
+    ): JsonResponse {
+        return response()->json([
+            'data' => $serializedItems,
+            'unread_count' => $unreadCount,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+            'message' => $message,
+        ]);
+    }
 }

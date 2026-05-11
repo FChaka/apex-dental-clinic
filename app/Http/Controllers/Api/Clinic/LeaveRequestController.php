@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\Clinic;
 
+use App\Events\LeaveRequestDecided;
+use App\Events\LeaveRequestSubmitted;
 use App\Http\Controllers\Controller;
 use App\Models\Tenant\LeaveRequest;
 use App\Models\Tenant\StaffMember;
@@ -86,6 +88,8 @@ final class LeaveRequestController extends Controller
 
         $lr->load(['staff' => fn ($q) => $q->select('id', 'name', 'role')]);
 
+        event(new LeaveRequestSubmitted($lr));
+
         return JsonApiResponse::success($this->serializeLeaveRequest($lr), 'OK', 201);
     }
 
@@ -112,6 +116,8 @@ final class LeaveRequestController extends Controller
         }
 
         $validated = $request->validate($rules);
+
+        $statusBefore = $leaveRequest->status;
 
         if (! $isAdmin && ! $canManage) {
             if (! $isOwner) {
@@ -142,6 +148,14 @@ final class LeaveRequestController extends Controller
         $leaveRequest->fill($validated);
         $leaveRequest->save();
         $leaveRequest->load(['staff' => fn ($q) => $q->select('id', 'name', 'role')]);
+
+        if (array_key_exists('status', $validated)) {
+            $newStatus = (string) $validated['status'];
+            if (in_array($newStatus, ['Approved', 'Rejected'], true) && $newStatus !== $statusBefore) {
+                $decision = $newStatus === 'Approved' ? 'approved' : 'rejected';
+                event(new LeaveRequestDecided($leaveRequest, $decision, $auth));
+            }
+        }
 
         return JsonApiResponse::success($this->serializeLeaveRequest($leaveRequest), 'OK');
     }

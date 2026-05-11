@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\Clinic\ClinicScheduleController;
 use App\Http\Controllers\Api\Clinic\ClinicSettingsController;
 use App\Http\Controllers\Api\Clinic\InvoiceController;
 use App\Http\Controllers\Api\Clinic\LeaveRequestController;
+use App\Http\Controllers\Api\Clinic\NotificationController;
 use App\Http\Controllers\Api\Clinic\PatientAnamnesisController;
 use App\Http\Controllers\Api\Clinic\PatientController;
 use App\Http\Controllers\Api\Clinic\PatientDocumentController;
@@ -88,6 +89,10 @@ Route::middleware('auth:clinic_session')->group(function () {
     Route::post('/leave-requests', [LeaveRequestController::class, 'store'])->name('api.leave-requests.store');
     Route::put('/leave-requests/{leaveRequest}', [LeaveRequestController::class, 'update'])->name('api.leave-requests.update');
     Route::delete('/leave-requests/{leaveRequest}', [LeaveRequestController::class, 'destroy'])->name('api.leave-requests.destroy');
+
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('api.notifications.index');
+    Route::put('/notifications/read-all', [NotificationController::class, 'readAll'])->name('api.notifications.read-all');
+    Route::put('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('api.notifications.read');
 
     // Widget preferences
     Route::get('/preferences/widgets', [WidgetPreferenceController::class, 'show'])->name('api.preferences.widgets.show');

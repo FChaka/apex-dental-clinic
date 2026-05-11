@@ -167,7 +167,7 @@ it('admin can create leave request for another staff member', function () {
 
 it('receptionist can create leave request for another staff member', function () {
     $receptionist = StaffMember::factory()->create([
-        'clinic_access_level' => 'staff',
+        'clinic_access_level' => 'admin',
         'role' => 'Receptionist',
     ]);
     $target = StaffMember::factory()->create(['clinic_access_level' => 'staff']);
