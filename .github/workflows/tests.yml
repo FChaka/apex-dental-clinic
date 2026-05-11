@@ -37,9 +37,6 @@ jobs:
       - name: Build Assets
         run: npm run build
 
-      - name: Create SQLite Database
-        run: touch database/database.sqlite
-
       - name: Install Dependencies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
@@ -50,4 +47,4 @@ jobs:
         run: php artisan key:generate
 
       - name: Tests
-        run: ./vendor/bin/phpunit
+        run: php artisan test --compact

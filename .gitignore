@@ -8,6 +8,7 @@
 /.idea
 /.nova
 /.phpunit.cache
+/database/testing.sqlite
 /.vscode
 /.zed
 /bootstrap/ssr

@@ -1,29 +1,68 @@
 <?php
 
+declare(strict_types=1);
+
+use App\Models\Central\Clinic;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Testing\TestResponse;
+use Tests\TenancyFeatureTestCase;
+use Tests\TestCase;
+
+/** @var array<int, Clinic> */
+$__tenantsToDrop = [];
+
 /*
 |--------------------------------------------------------------------------
 | Test Case
 |--------------------------------------------------------------------------
-|
-| The closure you provide to your test functions is always bound to a specific PHPUnit test
-| case class. By default, that class is "PHPUnit\Framework\TestCase". Of course, you may
-| need to change it using the "pest()" function to bind a different classes or traits.
-|
 */
 
-pest()->extend(Tests\TestCase::class)
-    ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
-    ->in('Feature');
+pest()->extend(TenancyFeatureTestCase::class)->in(
+    'Feature/Auth/ClinicAuthTest.php',
+    'Feature/Platform/PlatformAuthTest.php',
+    'Feature/Platform/PlatformClinicsTest.php',
+    'Feature/Platform/PlatformOverviewTest.php',
+    'Feature/Platform/PlatformSubscriptionsTest.php',
+    'Feature/Platform/PlatformServicesTest.php',
+    'Feature/Platform/PlatformSpendingsTest.php',
+    'Feature/Auth/SwitchStaffTest.php',
+    'Feature/Patients/PatientCrudTest.php',
+    'Feature/Patients/PatientMedicalHistoryTest.php',
+    'Feature/Patients/PatientAnamnesisTest.php',
+    'Feature/Patients/PatientTeethChartTest.php',
+    'Feature/Patients/PatientDocumentTest.php',
+    'Feature/Patients/PatientXrayTest.php',
+    'Feature/Patients/PatientMonthlyPlanTest.php',
+    'Feature/Patients/PatientInsightsTest.php',
+    'Feature/Appointments/AppointmentCrudTest.php',
+    'Feature/Treatments/TreatmentTypeTest.php',
+    'Feature/Treatments/PatientTreatmentEntryTest.php',
+    'Feature/Treatments/TreatmentRecordTest.php',
+    'Feature/Dashboard/DashboardStatsTest.php',
+    'Feature/Dashboard/WeeklyAppointmentsTest.php',
+    'Feature/Dashboard/MonthlyRevenueTest.php',
+    'Feature/Reports/DailyReportTest.php',
+    'Feature/Reports/DailyReportScopeTest.php',
+    'Feature/Reports/ReportsOverviewTest.php',
+    'Feature/Billing/PatientPaymentRecordTest.php',
+    'Feature/Billing/InvoiceTest.php',
+    'Feature/Settings/ClinicSettingsTest.php',
+    'Feature/Settings/ClinicScheduleTest.php',
+    'Feature/Staff/StaffCrudTest.php',
+    'Feature/Staff/StaffProfileSummaryTest.php',
+    'Feature/Staff/StaffDocumentTest.php',
+    'Feature/Staff/LeaveRequestTest.php',
+    'Feature/Preferences/WidgetPreferenceTest.php',
+    'Feature/Notifications/BroadcastingAuthTest.php',
+    'Feature/Notifications/NotificationTest.php',
+);
+
+pest()->extend(TestCase::class)->in('Unit');
 
 /*
 |--------------------------------------------------------------------------
 | Expectations
 |--------------------------------------------------------------------------
-|
-| When you're writing tests, you often need to check that values meet certain conditions. The
-| "expect()" function gives you access to a set of "expectations" methods that you can use
-| to assert different things. Of course, you may extend the Expectation API at any time.
-|
 */
 
 expect()->extend('toBeOne', function () {
@@ -32,16 +71,136 @@ expect()->extend('toBeOne', function () {
 
 /*
 |--------------------------------------------------------------------------
-| Functions
+| Tenancy helpers (IMPLEMENTATION_STRATEGY §8)
 |--------------------------------------------------------------------------
-|
-| While Pest is very powerful out-of-the-box, you may have some testing code specific to your
-| project that you don't want to repeat in every file. Here you can also expose helpers as
-| global functions to help you to reduce the number of lines of code in your test files.
-|
 */
 
-function something()
+function createTestTenant(?string $slug = null): Clinic
 {
-    // ..
+    global $__tenantsToDrop;
+
+    $slug ??= 't'.str_replace('.', '', uniqid('', true));
+    $dbName = 'apex_clinic_'.str_replace('-', '_', $slug);
+
+    // Pre-cleanup: remove leftover DB file from a crashed prior run
+    $dbPath = database_path($dbName);
+    if (is_file($dbPath)) {
+        @unlink($dbPath);
+    }
+
+    $clinic = Clinic::query()->create([
+        'name' => 'Test Clinic',
+        'slug' => $slug,
+        'contact_email' => 'test@example.com',
+        'status' => 'active',
+        'db_name' => $dbName,
+    ]);
+
+    $clinic->domains()->create([
+        'domain' => $slug,
+    ]);
+
+    $__tenantsToDrop[] = $clinic;
+
+    return $clinic->fresh() ?? $clinic;
 }
+
+function tenantHttpHost(Clinic $clinic): string
+{
+    return $clinic->slug.'.apex.test';
+}
+
+/**
+ * Host for the API (single domain for all tenants), e.g. api.apex.test when APP_URL is http://apex.test.
+ */
+function apiHttpHost(): string
+{
+    $host = parse_url((string) config('app.url'), PHP_URL_HOST);
+
+    return is_string($host) && $host !== '' ? 'api.'.$host : 'api.apex.test';
+}
+
+/**
+ * Clinic SPA origin URL (Referer) — {slug}.apex.test.
+ */
+function tenantUrl(Clinic $clinic, string $path): string
+{
+    return 'http://'.tenantHttpHost($clinic).'/'.ltrim($path, '/');
+}
+
+/**
+ * Absolute URL to the API for clinic routes (requires X-Tenant-Slug).
+ */
+function clinicApiUrl(Clinic $clinic, string $path): string
+{
+    return 'http://'.apiHttpHost().'/'.ltrim($path, '/');
+}
+
+/**
+ * Referer + tenant slug so Sanctum stateful middleware applies and ResolveTenantFromHeader can initialize tenancy.
+ *
+ * @return array<string, string>
+ */
+function clinicStatefulHeaders(Clinic $clinic): array
+{
+    return [
+        'Referer' => tenantUrl($clinic, '/'),
+        'X-Tenant-Slug' => $clinic->slug,
+    ];
+}
+
+/**
+ * @return array<string, string>
+ */
+function platformStatefulHeaders(): array
+{
+    return ['Referer' => rtrim((string) config('app.url'), '/').'/'];
+}
+
+/**
+ * @return array<string, string>
+ */
+function sessionCookiesFromResponse(TestResponse $response): array
+{
+    $cookie = $response->getCookie(config('session.cookie'));
+
+    if ($cookie === null) {
+        return [];
+    }
+
+    return [$cookie->getName() => $cookie->getValue()];
+}
+
+function dropTenantDatabaseIfExists(Clinic $clinic): void
+{
+    tenancy()->end();
+
+    $name = str_replace('`', '', $clinic->database()->getName());
+    $driver = (string) config('database.connections.'.config('tenancy.database.template_tenant_connection').'.driver');
+
+    if ($driver === 'sqlite') {
+        $path = database_path($name);
+
+        if (is_file($path)) {
+            @unlink($path);
+        }
+
+        return;
+    }
+
+    DB::connection('mysql')->statement('DROP DATABASE IF EXISTS `'.$name.'`');
+}
+
+afterEach(function () {
+    global $__tenantsToDrop;
+
+    foreach (array_reverse($__tenantsToDrop) as $clinic) {
+        try {
+            dropTenantDatabaseIfExists($clinic);
+        } catch (Throwable) {
+            // Best-effort cleanup; tests should still fail on assertions, not cleanup.
+        }
+    }
+
+    $__tenantsToDrop = [];
+});

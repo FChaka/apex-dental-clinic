@@ -21,14 +21,16 @@ return [
     'domain_model' => Domain::class,
 
     /**
-     * The list of domains hosting your central app.
+     * The list of domains hosting your central app (apex parent only, e.g. apex.com — not each tenant subdomain).
      *
      * Only relevant if you're using the domain or subdomain identification middleware.
+     *
+     * @see env('TENANCY_CENTRAL_DOMAINS')
      */
-    'central_domains' => [
-        '127.0.0.1',
-        'localhost',
-    ],
+    'central_domains' => array_values(array_filter(array_map(
+        trim(...),
+        explode(',', (string) env('TENANCY_CENTRAL_DOMAINS', 'localhost,127.0.0.1'))
+    ))),
 
     /**
      * Tenancy bootstrappers are executed when tenancy is initialized.
@@ -54,7 +56,7 @@ return [
          * Connection used as a "template" for the dynamically created tenant database connection.
          * Note: don't name your template connection tenant. That name is reserved by package.
          */
-        'template_tenant_connection' => 'mysql',
+        'template_tenant_connection' => env('TENANT_DB_TEMPLATE_CONNECTION', 'mysql'),
 
         /**
          * Overridden by AppServiceProvider via DatabaseConfig::generateDatabaseNamesUsing
@@ -188,7 +190,7 @@ return [
      * enabled. But it may be useful to disable them if you use external
      * storage (e.g. S3 / Dropbox) or have a custom asset controller.
      */
-    'routes' => false,
+    'routes' => (bool) env('TENANCY_ROUTES', false),
 
     /**
      * Parameters used by the tenants:migrate command.
